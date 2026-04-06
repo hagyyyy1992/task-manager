@@ -8,6 +8,7 @@ import './index.css'
 
 type FilterStatus = TaskStatus | 'all'
 type FilterCategory = TaskCategory | 'all'
+type SortKey = 'priority' | 'dueDate' | 'category' | 'createdAt'
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -15,6 +16,7 @@ function App() {
   const [editingTask, setEditingTask] = useState<Task | undefined>()
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
+  const [sortKey, setSortKey] = useState<SortKey>('priority')
 
   useEffect(() => {
     loadTasks().then(setTasks)
@@ -51,13 +53,33 @@ function App() {
   const sortedTasks = [...filtered].sort((a, b) => {
     if (a.status === 'done' && b.status !== 'done') return 1
     if (a.status !== 'done' && b.status === 'done') return -1
+
     const priorityOrder = { high: 0, medium: 1, low: 2 }
-    const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
-    if (pDiff !== 0) return pDiff
-    if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
-    if (a.dueDate) return -1
-    if (b.dueDate) return 1
-    return b.createdAt.localeCompare(a.createdAt)
+
+    switch (sortKey) {
+      case 'dueDate': {
+        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
+        if (a.dueDate) return -1
+        if (b.dueDate) return 1
+        return priorityOrder[a.priority] - priorityOrder[b.priority]
+      }
+      case 'category': {
+        const cmp = a.category.localeCompare(b.category)
+        if (cmp !== 0) return cmp
+        return priorityOrder[a.priority] - priorityOrder[b.priority]
+      }
+      case 'createdAt':
+        return b.createdAt.localeCompare(a.createdAt)
+      case 'priority':
+      default: {
+        const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
+        if (pDiff !== 0) return pDiff
+        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
+        if (a.dueDate) return -1
+        if (b.dueDate) return 1
+        return b.createdAt.localeCompare(a.createdAt)
+      }
+    }
   })
 
   const counts = {
@@ -128,6 +150,17 @@ function App() {
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
+          </select>
+
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1 text-sm text-gray-600 dark:text-gray-400 shadow-sm"
+          >
+            <option value="priority">優先度順</option>
+            <option value="dueDate">期限順</option>
+            <option value="category">カテゴリ順</option>
+            <option value="createdAt">作成日順</option>
           </select>
         </div>
 
