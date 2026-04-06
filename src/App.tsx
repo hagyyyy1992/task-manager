@@ -29,6 +29,7 @@ function App() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
   const [sortKey, setSortKey] = useState<SortKey>('priority')
+  const [searchText, setSearchText] = useState('')
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -67,6 +68,10 @@ function App() {
   const filtered = tasks.filter((t) => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false
     if (filterCategory !== 'all' && t.category !== filterCategory) return false
+    if (searchText) {
+      const q = searchText.toLowerCase()
+      if (!t.title.toLowerCase().includes(q) && !t.memo.toLowerCase().includes(q)) return false
+    }
     return true
   })
 
@@ -166,6 +171,17 @@ function App() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-4">
+        {/* Search */}
+        <div className="mb-3">
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="タスクを検索..."
+            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         {/* Filters */}
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="flex gap-1 bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm">
