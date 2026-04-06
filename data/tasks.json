@@ -1,0 +1,222 @@
+[
+  {
+    "id": "mnmzm8bfdo6ebh",
+    "title": "2026年分の個人確定申告",
+    "status": "todo",
+    "priority": "low",
+    "category": "決算・税務",
+    "dueDate": "2027-03-15",
+    "memo": "2026年1月の個人事業収入があるため",
+    "createdAt": "2026-04-06T09:28:03.483Z",
+    "updatedAt": "2026-04-06T09:28:03.483Z"
+  },
+  {
+    "id": "mnmzm79h3n2f3j",
+    "title": "個人事業の廃業届",
+    "status": "todo",
+    "priority": "low",
+    "category": "事務・手続き",
+    "dueDate": null,
+    "memo": "保留中。再開可能性あり",
+    "createdAt": "2026-04-06T09:28:02.117Z",
+    "updatedAt": "2026-04-06T09:28:02.117Z"
+  },
+  {
+    "id": "mnmzm5sw1b98vk",
+    "title": "複数端末からClaude使えるようにする",
+    "status": "todo",
+    "priority": "low",
+    "category": "その他",
+    "dueDate": null,
+    "memo": "",
+    "createdAt": "2026-04-06T09:28:00.224Z",
+    "updatedAt": "2026-04-06T09:28:00.224Z"
+  },
+  {
+    "id": "mnmzm546ia1md3",
+    "title": "洗濯機を買う",
+    "status": "todo",
+    "priority": "medium",
+    "category": "その他",
+    "dueDate": null,
+    "memo": "",
+    "createdAt": "2026-04-06T09:27:59.334Z",
+    "updatedAt": "2026-04-06T09:27:59.334Z"
+  },
+  {
+    "id": "mnmzm4f9j7g6el",
+    "title": "Blogバージョンアップ",
+    "status": "todo",
+    "priority": "low",
+    "category": "その他",
+    "dueDate": null,
+    "memo": "",
+    "createdAt": "2026-04-06T09:27:58.437Z",
+    "updatedAt": "2026-04-06T09:27:58.437Z"
+  },
+  {
+    "id": "mnmzm3p1flw8hi",
+    "title": "X(Twitter) プロフィール整備・フォロー・投稿開始",
+    "status": "todo",
+    "priority": "medium",
+    "category": "案件・営業",
+    "dueDate": null,
+    "memo": "無料採用チャネル構築。まずフォロー50-100人+週3投稿",
+    "createdAt": "2026-04-06T09:27:57.493Z",
+    "updatedAt": "2026-04-06T09:27:57.493Z"
+  },
+  {
+    "id": "mnmzm1s8m8be0k",
+    "title": "Line Likeアプリ開発",
+    "status": "todo",
+    "priority": "low",
+    "category": "プロダクト開発",
+    "dueDate": null,
+    "memo": "",
+    "createdAt": "2026-04-06T09:27:55.016Z",
+    "updatedAt": "2026-04-06T09:27:55.016Z"
+  },
+  {
+    "id": "mnmzm1bdavpz9a",
+    "title": "位置情報共有アプリ開発",
+    "status": "todo",
+    "priority": "low",
+    "category": "プロダクト開発",
+    "dueDate": null,
+    "memo": "",
+    "createdAt": "2026-04-06T09:27:54.409Z",
+    "updatedAt": "2026-04-06T09:27:54.409Z"
+  },
+  {
+    "id": "mnmzm0pa1cvdjm",
+    "title": "請求リマインダーアプリ開発（Phase 1-3）",
+    "status": "todo",
+    "priority": "high",
+    "category": "プロダクト開発",
+    "dueDate": "2026-04-30",
+    "memo": "",
+    "createdAt": "2026-04-06T09:27:53.614Z",
+    "updatedAt": "2026-04-06T09:27:53.614Z"
+  },
+  {
+    "id": "mnmzm0j62nmsod",
+    "title": "新規受託案件確保",
+    "status": "todo",
+    "priority": "high",
+    "category": "案件・営業",
+    "dueDate": "2026-05-31",
+    "memo": "Wantedly/Yenta/複業クラウドで並行。5月稼働開始目標",
+    "createdAt": "2026-04-06T09:27:53.394Z",
+    "updatedAt": "2026-04-06T09:27:53.394Z"
+  },
+  {
+    "id": "mnmzly0vkgawgb",
+    "title": "複業クラウド プロフィール完成",
+    "status": "todo",
+    "priority": "medium",
+    "category": "案件・営業",
+    "dueDate": null,
+    "memo": "技術タグ追加、自己紹介文に法人契約の旨を追記",
+    "createdAt": "2026-04-06T09:27:50.143Z",
+    "updatedAt": "2026-04-06T09:27:50.143Z"
+  },
+  {
+    "id": "mnmzlwlky9xm5g",
+    "title": "役員報酬支払い開始",
+    "status": "todo",
+    "priority": "high",
+    "category": "事務・手続き",
+    "dueDate": "2026-07-31",
+    "memo": "",
+    "createdAt": "2026-04-06T09:27:48.296Z",
+    "updatedAt": "2026-04-06T09:27:48.296Z"
+  },
+  {
+    "id": "mnmzlvoyizaa1m",
+    "title": "社会保険新規適用届を年金事務所に提出",
+    "status": "todo",
+    "priority": "high",
+    "category": "事務・手続き",
+    "dueDate": "2026-07-05",
+    "memo": "新規適用届+資格取得届。郵送/e-Gov/窓口",
+    "createdAt": "2026-04-06T09:27:47.122Z",
+    "updatedAt": "2026-04-06T09:27:47.122Z"
+  },
+  {
+    "id": "mnmzluq12viao6",
+    "title": "freee人事労務 ステップ3（従業員登録）",
+    "status": "todo",
+    "priority": "medium",
+    "category": "事務・手続き",
+    "dueDate": "2026-06-30",
+    "memo": "株主総会で報酬額決定後に実施",
+    "createdAt": "2026-04-06T09:27:45.865Z",
+    "updatedAt": "2026-04-06T09:27:45.865Z"
+  },
+  {
+    "id": "mnmzlttyrmzahm",
+    "title": "株主総会（決算承認 + 役員報酬決議）",
+    "status": "todo",
+    "priority": "high",
+    "category": "事務・手続き",
+    "dueDate": "2026-06-30",
+    "memo": "議事録作成・保管。報酬額決定",
+    "createdAt": "2026-04-06T09:27:44.710Z",
+    "updatedAt": "2026-04-06T09:27:44.710Z"
+  },
+  {
+    "id": "mnmzlt681j3mdm",
+    "title": "消費税100円差額を雑収入で処理",
+    "status": "todo",
+    "priority": "medium",
+    "category": "決算・税務",
+    "dueDate": null,
+    "memo": "未払消費税等38,400 - 実際納付38,300 = 100円",
+    "createdAt": "2026-04-06T09:27:43.856Z",
+    "updatedAt": "2026-04-06T09:27:43.856Z"
+  },
+  {
+    "id": "mnmzlsbsorfwno",
+    "title": "優良電子帳簿の届出書をe-Taxで提出",
+    "status": "todo",
+    "priority": "high",
+    "category": "決算・税務",
+    "dueDate": "2026-06-01",
+    "memo": "",
+    "createdAt": "2026-04-06T09:27:42.760Z",
+    "updatedAt": "2026-04-06T09:27:42.760Z"
+  },
+  {
+    "id": "mnmzlp5mkw2cza",
+    "title": "納付: 都民税+事業税 145,200円",
+    "status": "todo",
+    "priority": "high",
+    "category": "決算・税務",
+    "dueDate": "2026-06-01",
+    "memo": "eLTAX",
+    "createdAt": "2026-04-06T09:27:38.650Z",
+    "updatedAt": "2026-04-06T09:27:38.650Z"
+  },
+  {
+    "id": "mnmzlo2v66q0eu",
+    "title": "納付: 消費税 38,300円",
+    "status": "todo",
+    "priority": "high",
+    "category": "決算・税務",
+    "dueDate": "2026-06-01",
+    "memo": "e-Tax納付区分番号 7430936437",
+    "createdAt": "2026-04-06T09:27:37.255Z",
+    "updatedAt": "2026-04-06T09:27:37.255Z"
+  },
+  {
+    "id": "mnmzlnhvxbw0id",
+    "title": "納付: 法人税+地方法人税 246,200円",
+    "status": "todo",
+    "priority": "high",
+    "category": "決算・税務",
+    "dueDate": "2026-06-01",
+    "memo": "e-Tax納付区分番号 7430936230",
+    "createdAt": "2026-04-06T09:27:36.498Z",
+    "updatedAt": "2026-04-06T09:27:36.498Z"
+  }
+]
