@@ -1,14 +1,26 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Task, TaskStatus, TaskCategory } from './types'
 import { CATEGORIES } from './types'
 import { loadTasks, saveTasks } from './store'
 import { TaskForm } from './components/TaskForm'
 import { TaskItem } from './components/TaskItem'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import './index.css'
 
 type FilterStatus = TaskStatus | 'all'
 type FilterCategory = TaskCategory | 'all'
-type SortKey = 'priority' | 'dueDate' | 'category' | 'createdAt'
+type SortKey = 'manual' | 'priority' | 'dueDate' | 'category' | 'createdAt'
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -18,8 +30,16 @@ function App() {
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
   const [sortKey, setSortKey] = useState<SortKey>('priority')
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
   useEffect(() => {
-    loadTasks().then(setTasks)
+    let cancelled = false
+    loadTasks().then((data) => {
+      if (!cancelled) setTasks(data)
+    })
+    return () => { cancelled = true }
   }, [])
 
   const persist = useCallback((next: Task[]) => {
@@ -50,37 +70,67 @@ function App() {
     return true
   })
 
-  const sortedTasks = [...filtered].sort((a, b) => {
-    if (a.status === 'done' && b.status !== 'done') return 1
-    if (a.status !== 'done' && b.status === 'done') return -1
+  const displayTasks = useMemo(() => {
+    if (sortKey === 'manual') return filtered
 
-    const priorityOrder = { high: 0, medium: 1, low: 2 }
+    return [...filtered].sort((a, b) => {
+      if (a.status === 'done' && b.status !== 'done') return 1
+      if (a.status !== 'done' && b.status === 'done') return -1
 
-    switch (sortKey) {
-      case 'dueDate': {
-        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
-        if (a.dueDate) return -1
-        if (b.dueDate) return 1
-        return priorityOrder[a.priority] - priorityOrder[b.priority]
+      const priorityOrder = { high: 0, medium: 1, low: 2 }
+
+      switch (sortKey) {
+        case 'dueDate': {
+          if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
+          if (a.dueDate) return -1
+          if (b.dueDate) return 1
+          return priorityOrder[a.priority] - priorityOrder[b.priority]
+        }
+        case 'category': {
+          const cmp = a.category.localeCompare(b.category)
+          if (cmp !== 0) return cmp
+          return priorityOrder[a.priority] - priorityOrder[b.priority]
+        }
+        case 'createdAt':
+          return b.createdAt.localeCompare(a.createdAt)
+        case 'priority':
+        default: {
+          const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
+          if (pDiff !== 0) return pDiff
+          if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
+          if (a.dueDate) return -1
+          if (b.dueDate) return 1
+          return b.createdAt.localeCompare(a.createdAt)
+        }
       }
-      case 'category': {
-        const cmp = a.category.localeCompare(b.category)
-        if (cmp !== 0) return cmp
-        return priorityOrder[a.priority] - priorityOrder[b.priority]
-      }
-      case 'createdAt':
-        return b.createdAt.localeCompare(a.createdAt)
-      case 'priority':
-      default: {
-        const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
-        if (pDiff !== 0) return pDiff
-        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
-        if (a.dueDate) return -1
-        if (b.dueDate) return 1
-        return b.createdAt.localeCompare(a.createdAt)
+    })
+  }, [filtered, sortKey])
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over) return
+
+    // 現在の表示順をベースにする
+    const currentOrder = [...displayTasks]
+
+    if (active.id !== over.id) {
+      const oldIndex = currentOrder.findIndex((t) => t.id === active.id)
+      const newIndex = currentOrder.findIndex((t) => t.id === over.id)
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const [moved] = currentOrder.splice(oldIndex, 1)
+        currentOrder.splice(newIndex, 0, moved)
       }
     }
-  })
+
+    // ドラッグしたら常に手動モードに切り替え、現在の表示順を保存
+    const displayedIds = new Set(currentOrder.map((t) => t.id))
+    const hidden = tasks.filter((t) => !displayedIds.has(t.id))
+    const next = [...currentOrder, ...hidden]
+
+    setSortKey('manual')
+    setTasks(next)
+    saveTasks(next)
+  }
 
   const counts = {
     all: tasks.length,
@@ -157,6 +207,7 @@ function App() {
             onChange={(e) => setSortKey(e.target.value as SortKey)}
             className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1 text-sm text-gray-600 dark:text-gray-400 shadow-sm"
           >
+            <option value="manual">手動（D&D）</option>
             <option value="priority">優先度順</option>
             <option value="dueDate">期限順</option>
             <option value="category">カテゴリ順</option>
@@ -165,26 +216,38 @@ function App() {
         </div>
 
         {/* Task List */}
-        <div className="space-y-2">
-          {sortedTasks.length === 0 ? (
-            <p className="text-center text-gray-400 dark:text-gray-500 py-12">
-              {tasks.length === 0 ? 'タスクがありません' : 'フィルタに一致するタスクがありません'}
-            </p>
-          ) : (
-            sortedTasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onStatusChange={changeStatus}
-                onEdit={(t) => {
-                  setEditingTask(t)
-                  setShowForm(true)
-                }}
-                onDelete={deleteTask}
-              />
-            ))
-          )}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={displayTasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              {displayTasks.length === 0 ? (
+                <p className="text-center text-gray-400 dark:text-gray-500 py-12">
+                  {tasks.length === 0 ? 'タスクがありません' : 'フィルタに一致するタスクがありません'}
+                </p>
+              ) : (
+                displayTasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    onStatusChange={changeStatus}
+                    onEdit={(t) => {
+                      setEditingTask(t)
+                      setShowForm(true)
+                    }}
+                    onDelete={deleteTask}
+                    isDraggable={sortKey === 'manual'}
+                  />
+                ))
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
       </main>
 
       {showForm && (

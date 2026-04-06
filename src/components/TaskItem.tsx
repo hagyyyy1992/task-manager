@@ -1,10 +1,13 @@
 import type { Task, TaskStatus } from '../types'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Props {
   task: Task
   onStatusChange: (id: string, status: TaskStatus) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  isDraggable?: boolean
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -44,14 +47,42 @@ function formatDueDate(dateStr: string | null): { text: string; overdue: boolean
   return { text: dateStr, overdue: false }
 }
 
-export function TaskItem({ task, onStatusChange, onEdit, onDelete }: Props) {
+export function TaskItem({ task, onStatusChange, onEdit, onDelete, isDraggable = false }: Props) {
   const due = formatDueDate(task.dueDate)
   const isDone = task.status === 'done'
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id, disabled: !isDraggable })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  }
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={`border-l-4 ${PRIORITY_COLORS[task.priority]} bg-white dark:bg-gray-800 rounded-r-lg shadow-sm p-3 flex items-start gap-3 group ${isDone ? 'opacity-60' : ''}`}
     >
+      {isDraggable && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="mt-0.5 shrink-0 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 touch-none"
+          title="ドラッグで並べ替え"
+        >
+          ⠿
+        </button>
+      )}
+
       <button
         onClick={() => onStatusChange(task.id, NEXT_STATUS[task.status])}
         className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs transition-colors ${
