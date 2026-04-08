@@ -37,6 +37,18 @@ terraform init -upgrade
 op run --env-file=../.env.tpl -- \
   sh -c 'terraform apply -var="database_url=$DATABASE_URL" -auto-approve'
 
+echo "=== 4. S3にフロントエンドをアップロード ==="
+S3_BUCKET=$(terraform output -raw s3_bucket_name)
+cd "$SCRIPT_DIR"
+
+aws s3 sync dist/ s3://$S3_BUCKET/ \
+  --delete \
+  --exclude "*.html" \
+  --cache-control "public, max-age=31536000, immutable"
+
+aws s3 cp dist/index.html s3://$S3_BUCKET/index.html \
+  --cache-control "no-cache, no-store, must-revalidate"
+
 echo ""
 echo "=== デプロイ完了 ==="
 echo ""
