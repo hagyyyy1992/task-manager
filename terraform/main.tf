@@ -52,7 +52,6 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
   signing_protocol                  = "sigv4"
 }
 
-# バケットポリシーは CloudFront Distribution の ARN が必要なので後で設定
 resource "aws_s3_bucket_policy" "frontend" {
   bucket = aws_s3_bucket.frontend.id
   policy = jsonencode({
@@ -110,24 +109,60 @@ resource "aws_lambda_function" "api" {
   }
 }
 
-resource "aws_lambda_function_url" "api" {
-  function_name      = aws_lambda_function.api.function_name
-  authorization_type = "NONE"
+# ─── API Gateway HTTP API ────────────────────────────────────────────────────
 
-  cors {
-    allow_credentials = false
-    allow_origins     = ["*"]
-    allow_methods     = ["GET", "PUT"]
-    allow_headers     = ["Content-Type"]
-    max_age           = 300
-  }
+resource "aws_apigatewayv2_api" "api" {
+  name          = "${var.project_name}-api"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "lambda" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.api.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "default" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_stage" "default" {
+  api_id      = aws_apigatewayv2_api.api.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "apigw" {
+  statement_id  = "AllowAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*"
+}
+
+# ─── CloudFront Function (SPAルーティング) ───────────────────────────────────
+
+resource "aws_cloudfront_function" "spa_routing" {
+  name    = "${var.project_name}-spa-routing"
+  runtime = "cloudfront-js-2.0"
+  code    = <<-EOF
+    function handler(event) {
+      var request = event.request;
+      if (!request.uri.includes('.')) {
+        request.uri = '/index.html';
+      }
+      return request;
+    }
+  EOF
 }
 
 # ─── CloudFront Distribution ─────────────────────────────────────────────────
 
 locals {
-  # "https://xxx.lambda-url.ap-northeast-1.on.aws/" → "xxx.lambda-url.ap-northeast-1.on.aws"
-  lambda_url_host = trim(replace(aws_lambda_function_url.api.function_url, "https://", ""), "/")
+  apigw_host = replace(aws_apigatewayv2_api.api.api_endpoint, "https://", "")
 }
 
 resource "aws_cloudfront_distribution" "main" {
@@ -142,10 +177,10 @@ resource "aws_cloudfront_distribution" "main" {
     origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
   }
 
-  # Origin 2: Lambda Function URL (API)
+  # Origin 2: API Gateway HTTP API
   origin {
-    domain_name = local.lambda_url_host
-    origin_id   = "LambdaAPI"
+    domain_name = local.apigw_host
+    origin_id   = "APIGW"
     custom_origin_config {
       http_port              = 80
       https_port             = 443
@@ -167,15 +202,20 @@ resource "aws_cloudfront_distribution" "main" {
       cookies { forward = "none" }
     }
 
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_routing.arn
+    }
+
     min_ttl     = 0
     default_ttl = 3600
     max_ttl     = 86400
   }
 
-  # /api/* ビヘイビア: Lambda (キャッシュ無効)
+  # /api/* ビヘイビア: API Gateway (キャッシュ無効)
   ordered_cache_behavior {
     path_pattern           = "/api/*"
-    target_origin_id       = "LambdaAPI"
+    target_origin_id       = "APIGW"
     viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods         = ["GET", "HEAD"]
@@ -190,20 +230,6 @@ resource "aws_cloudfront_distribution" "main" {
     min_ttl     = 0
     default_ttl = 0
     max_ttl     = 0
-  }
-
-  # SPAルーティング用: 404/403 → index.html
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 0
-  }
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 0
   }
 
   restrictions {
