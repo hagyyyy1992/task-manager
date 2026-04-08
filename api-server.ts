@@ -1,25 +1,7 @@
 import { createServer } from "http";
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { getAllTasksRaw, saveAllTasks } from "./db.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = join(__dirname, "data", "tasks.json");
-
-function load() {
-  if (!existsSync(DATA_FILE)) return [];
-  try {
-    return JSON.parse(readFileSync(DATA_FILE, "utf-8"));
-  } catch {
-    return [];
-  }
-}
-
-function save(data: unknown) {
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, PUT, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -30,25 +12,36 @@ const server = createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/api/tasks" && req.method === "GET") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(load()));
-    return;
-  }
-
-  if (req.url === "/api/tasks" && req.method === "PUT") {
-    let body = "";
-    req.on("data", (chunk) => (body += chunk));
-    req.on("end", () => {
-      save(JSON.parse(body));
+  try {
+    if (req.url === "/api/tasks" && req.method === "GET") {
+      const tasks = await getAllTasksRaw();
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true }));
-    });
-    return;
-  }
+      res.end(JSON.stringify(tasks));
+      return;
+    }
 
-  res.writeHead(404);
-  res.end();
+    if (req.url === "/api/tasks" && req.method === "PUT") {
+      let body = "";
+      req.on("data", (chunk) => (body += chunk));
+      req.on("end", async () => {
+        try {
+          await saveAllTasks(JSON.parse(body));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: String(e) }));
+        }
+      });
+      return;
+    }
+
+    res.writeHead(404);
+    res.end();
+  } catch (e) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: String(e) }));
+  }
 });
 
 server.listen(3456, () => {

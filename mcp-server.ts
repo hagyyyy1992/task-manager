@@ -1,37 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = join(__dirname, "data", "tasks.json");
-
-interface Task {
-  id: string;
-  title: string;
-  status: "todo" | "in_progress" | "done";
-  priority: "high" | "medium" | "low";
-  category: string;
-  dueDate: string | null;
-  memo: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-function loadTasks(): Task[] {
-  if (!existsSync(DATA_FILE)) return [];
-  try {
-    return JSON.parse(readFileSync(DATA_FILE, "utf-8"));
-  } catch {
-    return [];
-  }
-}
-
-function saveTasks(tasks: Task[]): void {
-  writeFileSync(DATA_FILE, JSON.stringify(tasks, null, 2));
-}
+import { loadTasks, createTask, updateTask, deleteTask, type Task } from "./db.js";
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -54,9 +24,7 @@ server.tool(
     category: z.string().optional().describe("フィルタするカテゴリ"),
   },
   async ({ status, category }) => {
-    let tasks = loadTasks();
-    if (status) tasks = tasks.filter((t) => t.status === status);
-    if (category) tasks = tasks.filter((t) => t.category === category);
+    const tasks = await loadTasks({ status, category });
 
     const summary = tasks
       .map((t) => {
@@ -100,7 +68,6 @@ server.tool(
     memo: z.string().default("").describe("メモ"),
   },
   async ({ title, priority, category, dueDate, memo }) => {
-    const tasks = loadTasks();
     const now = new Date().toISOString();
     const task: Task = {
       id: generateId(),
@@ -113,8 +80,7 @@ server.tool(
       createdAt: now,
       updatedAt: now,
     };
-    tasks.unshift(task);
-    saveTasks(tasks);
+    await createTask(task);
     return {
       content: [{ type: "text", text: `作成しました: ${task.title} (id: ${task.id})` }],
     };
@@ -134,19 +100,10 @@ server.tool(
     dueDate: z.string().optional().describe("期限 (YYYY-MM-DD)。空文字で削除"),
   },
   async ({ id, ...updates }) => {
-    const tasks = loadTasks();
-    const idx = tasks.findIndex((t) => t.id === id);
-    if (idx === -1) {
+    const task = await updateTask(id, updates);
+    if (!task) {
       return { content: [{ type: "text", text: `タスクが見つかりません: ${id}` }] };
     }
-    const task = tasks[idx];
-    if (updates.status !== undefined) task.status = updates.status;
-    if (updates.priority !== undefined) task.priority = updates.priority;
-    if (updates.title !== undefined) task.title = updates.title;
-    if (updates.memo !== undefined) task.memo = updates.memo;
-    if (updates.dueDate !== undefined) task.dueDate = updates.dueDate || null;
-    task.updatedAt = new Date().toISOString();
-    saveTasks(tasks);
     return {
       content: [{ type: "text", text: `更新しました: ${task.title}` }],
     };
@@ -161,14 +118,12 @@ server.tool(
     id: z.string().describe("タスクID"),
   },
   async ({ id }) => {
-    const tasks = loadTasks();
-    const target = tasks.find((t) => t.id === id);
-    if (!target) {
+    const task = await deleteTask(id);
+    if (!task) {
       return { content: [{ type: "text", text: `タスクが見つかりません: ${id}` }] };
     }
-    saveTasks(tasks.filter((t) => t.id !== id));
     return {
-      content: [{ type: "text", text: `削除しました: ${target.title}` }],
+      content: [{ type: "text", text: `削除しました: ${task.title}` }],
     };
   }
 );
