@@ -1,0 +1,81 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Bundle Lambda
+        run: |
+          mkdir -p terraform/.lambda-build
+          npx esbuild handler.ts \
+            --bundle \
+            --platform=node \
+            --target=node22 \
+            --format=cjs \
+            --outfile=terraform/.lambda-build/index.js \
+            --log-level=info
+          echo '{"name":"task-app-lambda"}' > terraform/.lambda-build/package.json
+          cd terraform/.lambda-build && zip -r function.zip index.js package.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      # S3_BUCKET_NAME / CLOUDFRONT_DISTRIBUTION_ID / LAMBDA_FUNCTION_NAME は
+      # 初回 deploy.sh 実行後に GitHub リポジトリの Variables に設定する
+      - name: Sync frontend to S3
+        run: |
+          # JS/CSS: Viteがコンテンツハッシュ付きファイル名を生成するので長期キャッシュ
+          aws s3 sync dist/ s3://${{ vars.S3_BUCKET_NAME }}/ \
+            --delete \
+            --exclude "*.html" \
+            --cache-control "public, max-age=31536000, immutable"
+          # HTML: 常に最新を返す
+          aws s3 cp dist/index.html s3://${{ vars.S3_BUCKET_NAME }}/index.html \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+      - name: Update Lambda function
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://terraform/.lambda-build/function.zip \
+            --region ap-northeast-1
+
+          # デプロイ完了を待機
+          aws lambda wait function-updated \
+            --function-name ${{ vars.LAMBDA_FUNCTION_NAME }} \
+            --region ap-northeast-1
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"

@@ -1,6 +1,6 @@
 import type { Task } from './types'
 
-const API = 'http://localhost:3456/api/tasks'
+const API = '/api/tasks'
 
 export async function loadTasks(): Promise<Task[]> {
   try {

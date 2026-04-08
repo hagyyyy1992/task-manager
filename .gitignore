@@ -4,3 +4,7 @@ dist
 data/tasks.json
 .env
 .env.keys
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/.lambda-build/
