@@ -18,6 +18,7 @@ npx esbuild handler.ts \
   --target=node22 \
   --format=cjs \
   --outfile=terraform/.lambda-build/index.js \
+  --define:'import.meta.url="file:///var/task/index.js"' \
   --log-level=info
 
 # Lambda ランタイムに type:module の影響が出ないよう独立した package.json を配置
@@ -32,10 +33,9 @@ cd terraform
 terraform init -upgrade
 
 # op run でシークレットを環境変数に展開 (ファイルに書き出さない)
+# sh -c で囲むことで $DATABASE_URL を op run の子プロセス内で展開させる
 op run --env-file=../.env.tpl -- \
-  terraform apply \
-  -var="database_url=$DATABASE_URL" \
-  -auto-approve
+  sh -c 'terraform apply -var="database_url=$DATABASE_URL" -auto-approve'
 
 echo ""
 echo "=== デプロイ完了 ==="

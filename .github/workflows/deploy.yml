@@ -38,6 +38,7 @@ jobs:
             --target=node22 \
             --format=cjs \
             --outfile=terraform/.lambda-build/index.js \
+            --define:'import.meta.url="file:///var/task/index.js"' \
             --log-level=info
           echo '{"name":"task-app-lambda"}' > terraform/.lambda-build/package.json
           cd terraform/.lambda-build && zip -r function.zip index.js package.json
