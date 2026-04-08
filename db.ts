@@ -50,7 +50,7 @@ function rowToTask(row: DbRow): Task {
     priority: row.priority as Task["priority"],
     category: row.category,
     dueDate: row.due_date
-      ? new Date(row.due_date).toISOString().slice(0, 10)
+      ? String(row.due_date).slice(0, 10)
       : null,
     memo: row.memo,
     createdAt: row.created_at,
