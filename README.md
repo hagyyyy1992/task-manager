@@ -2,6 +2,9 @@
 
 個人タスク管理アプリ。React フロントエンド + Node.js API サーバー + MCP サーバーの3層構成で、Neon PostgreSQL をバックエンドに使用することで複数端末間でタスクを同期できる。
 
+アプリURL: 
+https://d3pi0juuilndgb.cloudfront.net
+
 ## 構成
 
 ```
