@@ -1,7 +1,11 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, types } from "@neondatabase/serverless";
 import { readFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+
+// Neon's default DATE parser uses `new Date(y, m, d)` (local time),
+// which shifts dates depending on the runtime timezone. Keep as strings.
+types.setTypeParser(1082, (val: string) => val);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const envFile = join(__dirname, ".env");
@@ -36,7 +40,7 @@ interface DbRow {
   status: string;
   priority: string;
   category: string;
-  due_date: string | Date | null;
+  due_date: string | null;
   memo: string;
   created_at: string;
   updated_at: string;
@@ -49,11 +53,7 @@ function rowToTask(row: DbRow): Task {
     status: row.status as Task["status"],
     priority: row.priority as Task["priority"],
     category: row.category,
-    dueDate: row.due_date
-      ? (row.due_date instanceof Date
-          ? `${row.due_date.getUTCFullYear()}-${String(row.due_date.getUTCMonth() + 1).padStart(2, '0')}-${String(row.due_date.getUTCDate()).padStart(2, '0')}`
-          : String(row.due_date).slice(0, 10))
-      : null,
+    dueDate: row.due_date ? String(row.due_date).slice(0, 10) : null,
     memo: row.memo,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
