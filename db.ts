@@ -119,17 +119,3 @@ export async function deleteTask(id: string): Promise<Task | null> {
   return task;
 }
 
-export async function getAllTasksRaw(): Promise<Task[]> {
-  const rows = (await sql`SELECT * FROM tasks ORDER BY created_at DESC`) as DbRow[];
-  return rows.map(rowToTask);
-}
-
-export async function saveAllTasks(tasks: Task[]): Promise<void> {
-  await sql`DELETE FROM tasks`;
-  for (const t of tasks) {
-    await sql`
-      INSERT INTO tasks (id, title, status, priority, category, due_date, memo, created_at, updated_at)
-      VALUES (${t.id}, ${t.title}, ${t.status}, ${t.priority}, ${t.category}, ${t.dueDate}, ${t.memo}, ${t.createdAt}, ${t.updatedAt})
-    `;
-  }
-}
