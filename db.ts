@@ -36,7 +36,7 @@ interface DbRow {
   status: string;
   priority: string;
   category: string;
-  due_date: string | null;
+  due_date: string | Date | null;
   memo: string;
   created_at: string;
   updated_at: string;
@@ -50,7 +50,9 @@ function rowToTask(row: DbRow): Task {
     priority: row.priority as Task["priority"],
     category: row.category,
     dueDate: row.due_date
-      ? String(row.due_date).slice(0, 10)
+      ? (row.due_date instanceof Date
+          ? `${row.due_date.getUTCFullYear()}-${String(row.due_date.getUTCMonth() + 1).padStart(2, '0')}-${String(row.due_date.getUTCDate()).padStart(2, '0')}`
+          : String(row.due_date).slice(0, 10))
       : null,
     memo: row.memo,
     createdAt: row.created_at,
