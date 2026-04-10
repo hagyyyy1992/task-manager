@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Task, TaskStatus, TaskCategory } from './types'
 import { CATEGORIES } from './types'
-import { loadTasks, saveTasks } from './store'
+import { loadTasks, apiCreateTask, apiUpdateTask, apiDeleteTask } from './store'
 import { TaskForm } from './components/TaskForm'
 import { TaskItem } from './components/TaskItem'
 import {
@@ -39,31 +39,62 @@ function App() {
     let cancelled = false
     loadTasks().then((data) => {
       if (!cancelled) setTasks(data)
-    })
+    }).catch(console.error)
     return () => { cancelled = true }
   }, [])
 
-  const persist = useCallback((next: Task[]) => {
-    setTasks(next)
-    saveTasks(next)
+  const addTask = useCallback(async (task: Task) => {
+    setTasks((prev) => [task, ...prev])
+    try {
+      await apiCreateTask(task)
+    } catch (e) {
+      console.error(e)
+      setTasks((prev) => prev.filter((t) => t.id !== task.id))
+    }
   }, [])
 
-  const addTask = (task: Task) => persist([task, ...tasks])
+  const updateTask = useCallback(async (updated: Task) => {
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+    try {
+      await apiUpdateTask(updated.id, {
+        title: updated.title,
+        status: updated.status,
+        priority: updated.priority,
+        memo: updated.memo,
+        dueDate: updated.dueDate,
+      })
+    } catch (e) {
+      console.error(e)
+      loadTasks().then(setTasks).catch(console.error)
+    }
+  }, [])
 
-  const updateTask = (updated: Task) =>
-    persist(tasks.map((t) => (t.id === updated.id ? updated : t)))
-
-  const deleteTask = (id: string) => {
+  const deleteTask = useCallback(async (id: string) => {
     if (!confirm('削除しますか？')) return
-    persist(tasks.filter((t) => t.id !== id))
-  }
+    const prev = tasks
+    setTasks((t) => t.filter((task) => task.id !== id))
+    try {
+      await apiDeleteTask(id)
+    } catch (e) {
+      console.error(e)
+      setTasks(prev)
+    }
+  }, [tasks])
 
-  const changeStatus = (id: string, status: TaskStatus) =>
-    persist(
-      tasks.map((t) =>
-        t.id === id ? { ...t, status, updatedAt: new Date().toISOString() } : t
+  const changeStatus = useCallback(async (id: string, status: TaskStatus) => {
+    const now = new Date().toISOString()
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, status, updatedAt: now } : t
       )
     )
+    try {
+      await apiUpdateTask(id, { status })
+    } catch (e) {
+      console.error(e)
+      loadTasks().then(setTasks).catch(console.error)
+    }
+  }, [])
 
   const filtered = tasks.filter((t) => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false
@@ -115,7 +146,6 @@ function App() {
     const { active, over } = event
     if (!over) return
 
-    // 現在の表示順をベースにする
     const currentOrder = [...displayTasks]
 
     if (active.id !== over.id) {
@@ -127,14 +157,12 @@ function App() {
       }
     }
 
-    // ドラッグしたら常に手動モードに切り替え、現在の表示順を保存
     const displayedIds = new Set(currentOrder.map((t) => t.id))
     const hidden = tasks.filter((t) => !displayedIds.has(t.id))
     const next = [...currentOrder, ...hidden]
 
     setSortKey('manual')
     setTasks(next)
-    saveTasks(next)
   }
 
   const counts = {
@@ -151,7 +179,7 @@ function App() {
           <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">Task Manager</h1>
           <div className="flex gap-2">
             <button
-              onClick={() => loadTasks().then(setTasks)}
+              onClick={() => loadTasks().then(setTasks).catch(console.error)}
               className="px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-sm"
               title="更新"
             >
