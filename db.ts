@@ -173,11 +173,11 @@ export async function findUserById(id: string): Promise<User | null> {
   return rowToUser(rows[0]);
 }
 
-export async function createUser(id: string, email: string, name: string, passwordHash: string): Promise<User> {
+export async function createUser(id: string, email: string, name: string, passwordHash: string, termsAgreedAt?: string): Promise<User> {
   const now = new Date().toISOString();
   await sql`
-    INSERT INTO users (id, email, name, password_hash, created_at, updated_at)
-    VALUES (${id}, ${email}, ${name}, ${passwordHash}, ${now}, ${now})
+    INSERT INTO users (id, email, name, password_hash, terms_agreed_at, created_at, updated_at)
+    VALUES (${id}, ${email}, ${name}, ${passwordHash}, ${termsAgreedAt ?? null}, ${now}, ${now})
   `;
   return { id, email, name, createdAt: now, updatedAt: now };
 }

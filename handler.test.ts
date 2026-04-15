@@ -166,7 +166,7 @@ describe("auth middleware", () => {
 // ─── アカウント登録テスト ────────────────────────────────────────
 
 describe("POST /api/auth/register", () => {
-  it("registers a new user", async () => {
+  it("registers a new user with terms agreed", async () => {
     vi.mocked(findUserByEmail).mockResolvedValue(null);
     vi.mocked(createUser).mockResolvedValue(mockUser);
 
@@ -174,6 +174,7 @@ describe("POST /api/auth/register", () => {
       email: "test@example.com",
       password: "password1234",
       name: "Test User",
+      termsAgreed: true,
     }, false));
 
     expect(res.statusCode).toBe(201);
@@ -195,9 +196,31 @@ describe("POST /api/auth/register", () => {
       email: "test@example.com",
       password: "short",
       name: "Test",
+      termsAgreed: true,
     }, false));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toContain("8 characters");
+  });
+
+  it("returns 400 when terms are not agreed", async () => {
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+      termsAgreed: false,
+    }, false));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain("利用規約");
+  });
+
+  it("returns 400 when termsAgreed is missing", async () => {
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+    }, false));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain("利用規約");
   });
 
   it("returns 409 when email is already registered", async () => {
@@ -207,6 +230,7 @@ describe("POST /api/auth/register", () => {
       email: "test@example.com",
       password: "password1234",
       name: "Test User",
+      termsAgreed: true,
     }, false));
 
     expect(res.statusCode).toBe(409);

@@ -39,7 +39,7 @@ const server = createServer(async (req, res) => {
 
     // POST /api/auth/register
     if (url === "/api/auth/register" && req.method === "POST") {
-      const { email, password, name } = JSON.parse(await readBody(req));
+      const { email, password, name, termsAgreed } = JSON.parse(await readBody(req));
 
       if (!email || !password || !name) {
         res.writeHead(400, { "Content-Type": "application/json" });
@@ -49,6 +49,11 @@ const server = createServer(async (req, res) => {
       if (password.length < 8) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "password must be at least 8 characters" }));
+        return;
+      }
+      if (!termsAgreed) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "利用規約への同意が必要です" }));
         return;
       }
 
@@ -61,7 +66,8 @@ const server = createServer(async (req, res) => {
 
       const id = generateId();
       const passwordHash = await hashPassword(password);
-      const user = await createUser(id, email, name, passwordHash);
+      const termsAgreedAt = new Date().toISOString();
+      const user = await createUser(id, email, name, passwordHash, termsAgreedAt);
       const token = await createToken(user.id);
 
       res.writeHead(201, { "Content-Type": "application/json" });

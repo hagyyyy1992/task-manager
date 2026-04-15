@@ -47,13 +47,16 @@ export const handler = async (event: LambdaEvent) => {
 
     // POST /api/auth/register
     if (path === "/api/auth/register" && method === "POST") {
-      const { email, password, name } = parseBody(event) as { email: string; password: string; name: string };
+      const { email, password, name, termsAgreed } = parseBody(event) as { email: string; password: string; name: string; termsAgreed?: boolean };
 
       if (!email || !password || !name) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: "email, password, name are required" }) };
       }
       if (password.length < 8) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: "password must be at least 8 characters" }) };
+      }
+      if (!termsAgreed) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "利用規約への同意が必要です" }) };
       }
 
       const existing = await findUserByEmail(email);
@@ -63,7 +66,8 @@ export const handler = async (event: LambdaEvent) => {
 
       const id = generateId();
       const passwordHash = await hashPassword(password);
-      const user = await createUser(id, email, name, passwordHash);
+      const termsAgreedAt = new Date().toISOString();
+      const user = await createUser(id, email, name, passwordHash, termsAgreedAt);
       const token = await createToken(user.id);
 
       return { statusCode: 201, headers, body: JSON.stringify({ user, token }) };

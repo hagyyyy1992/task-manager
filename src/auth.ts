@@ -30,11 +30,11 @@ export function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export async function register(email: string, password: string, name: string): Promise<User> {
+export async function register(email: string, password: string, name: string, termsAgreed: boolean): Promise<User> {
   const res = await fetch(`${API}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({ email, password, name, termsAgreed }),
   })
   if (!res.ok) {
     const err = await res.json()
