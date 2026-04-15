@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import { changePassword } from '../auth'
+import { PasswordInput } from '../components/PasswordInput'
 
 export function AccountPage() {
   const { user, logout, deleteAccount } = useAuth()
@@ -102,28 +103,8 @@ export function AccountPage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">現在のパスワード</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-              className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">新しいパスワード（8文字以上）</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          <PasswordInput label="現在のパスワード" value={currentPassword} onChange={setCurrentPassword} required />
+          <PasswordInput label="新しいパスワード（8文字以上）" value={newPassword} onChange={setNewPassword} required minLength={8} />
 
           <button
             type="submit"
