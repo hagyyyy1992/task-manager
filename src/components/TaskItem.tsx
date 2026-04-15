@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import type { Task, TaskStatus } from '../types'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -5,7 +6,6 @@ import { CSS } from '@dnd-kit/utilities'
 interface Props {
   task: Task
   onStatusChange: (id: string, status: TaskStatus) => void
-  onEdit: (task: Task) => void
   onDelete: (id: string) => void
   isDraggable?: boolean
 }
@@ -47,7 +47,8 @@ function formatDueDate(dateStr: string | null): { text: string; overdue: boolean
   return { text: dateStr, overdue: false }
 }
 
-export function TaskItem({ task, onStatusChange, onEdit, onDelete, isDraggable = false }: Props) {
+export function TaskItem({ task, onStatusChange, onDelete, isDraggable = false }: Props) {
+  const navigate = useNavigate()
   const due = formatDueDate(task.dueDate)
   const isDone = task.status === 'done'
 
@@ -97,9 +98,12 @@ export function TaskItem({ task, onStatusChange, onEdit, onDelete, isDraggable =
         {isDone && '✓'}
       </button>
 
-      <div className="flex-1 min-w-0">
+      <div
+        className="flex-1 min-w-0 cursor-pointer"
+        onClick={() => navigate(`/task/${task.id}`)}
+      >
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`font-medium text-gray-900 dark:text-gray-100 ${isDone ? 'line-through' : ''}`}>
+          <span className={`font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 ${isDone ? 'line-through' : ''}`}>
             {task.title}
           </span>
           <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_COLORS[task.status]}`}>
@@ -126,11 +130,11 @@ export function TaskItem({ task, onStatusChange, onEdit, onDelete, isDraggable =
 
       <div className="shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          onClick={() => onEdit(task)}
+          onClick={() => navigate(`/task/${task.id}`)}
           className="text-gray-400 hover:text-blue-500 p-1 text-sm"
-          title="編集"
+          title="詳細"
         >
-          編集
+          詳細
         </button>
         <button
           onClick={() => onDelete(task.id)}

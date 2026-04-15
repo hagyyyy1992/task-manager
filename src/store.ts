@@ -8,6 +8,11 @@ export async function loadTasks(): Promise<Task[]> {
   return await res.json()
 }
 
+export async function loadTask(id: string): Promise<Task | null> {
+  const tasks = await loadTasks()
+  return tasks.find((t) => t.id === id) ?? null
+}
+
 export async function apiCreateTask(task: Task): Promise<void> {
   const res = await fetch(API, {
     method: 'POST',
