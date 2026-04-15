@@ -193,6 +193,7 @@ export async function updateUserPassword(id: string, passwordHash: string): Prom
 export async function deleteUser(id: string): Promise<boolean> {
   const rows = (await sql`SELECT id FROM users WHERE id = ${id}`) as { id: string }[];
   if (rows.length === 0) return false;
+  await sql`DELETE FROM tasks WHERE user_id = ${id}`;
   await sql`DELETE FROM users WHERE id = ${id}`;
   return true;
 }
