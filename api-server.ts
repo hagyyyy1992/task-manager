@@ -82,14 +82,14 @@ const server = createServer(async (req, res) => {
       const userRow = await findUserByEmail(email);
       if (!userRow) {
         res.writeHead(401, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "invalid credentials" }));
+        res.end(JSON.stringify({ error: "メールアドレスまたはパスワードが正しくありません" }));
         return;
       }
 
       const valid = await verifyPassword(password, userRow.password_hash);
       if (!valid) {
         res.writeHead(401, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "invalid credentials" }));
+        res.end(JSON.stringify({ error: "メールアドレスまたはパスワードが正しくありません" }));
         return;
       }
 

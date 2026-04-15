@@ -79,12 +79,12 @@ export const handler = async (event: LambdaEvent) => {
 
       const userRow = await findUserByEmail(email);
       if (!userRow) {
-        return { statusCode: 401, headers, body: JSON.stringify({ error: "invalid credentials" }) };
+        return { statusCode: 401, headers, body: JSON.stringify({ error: "メールアドレスまたはパスワードが正しくありません" }) };
       }
 
       const valid = await verifyPassword(password, userRow.password_hash);
       if (!valid) {
-        return { statusCode: 401, headers, body: JSON.stringify({ error: "invalid credentials" }) };
+        return { statusCode: 401, headers, body: JSON.stringify({ error: "メールアドレスまたはパスワードが正しくありません" }) };
       }
 
       const token = await createToken(userRow.id);
