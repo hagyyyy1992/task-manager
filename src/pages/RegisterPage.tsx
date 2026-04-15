@@ -83,8 +83,8 @@ export function RegisterPage() {
 
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+            disabled={submitting || !termsAgreed}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? '登録中...' : '登録'}
           </button>
