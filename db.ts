@@ -182,6 +182,14 @@ export async function createUser(id: string, email: string, name: string, passwo
   return { id, email, name, createdAt: now, updatedAt: now };
 }
 
+export async function updateUserPassword(id: string, passwordHash: string): Promise<boolean> {
+  const rows = (await sql`SELECT id FROM users WHERE id = ${id}`) as { id: string }[];
+  if (rows.length === 0) return false;
+  const now = new Date().toISOString();
+  await sql`UPDATE users SET password_hash = ${passwordHash}, updated_at = ${now} WHERE id = ${id}`;
+  return true;
+}
+
 export async function deleteUser(id: string): Promise<boolean> {
   const rows = (await sql`SELECT id FROM users WHERE id = ${id}`) as { id: string }[];
   if (rows.length === 0) return false;

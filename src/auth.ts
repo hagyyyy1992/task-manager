@@ -77,6 +77,20 @@ export async function fetchMe(): Promise<User | null> {
   return await res.json()
 }
 
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const token = localStorage.getItem('token')
+  if (!token) throw new Error('Not authenticated')
+  const res = await fetch(`${API}/password`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || 'Failed to change password')
+  }
+}
+
 export async function deleteAccount(): Promise<void> {
   const token = getToken()
   if (!token) return

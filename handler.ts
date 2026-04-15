@@ -1,4 +1,4 @@
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, deleteUser } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
 
@@ -112,6 +112,33 @@ export const handler = async (event: LambdaEvent) => {
         return { statusCode: 404, headers, body: JSON.stringify({ error: "user not found" }) };
       }
       return { statusCode: 200, headers, body: JSON.stringify(user) };
+    }
+
+    // PATCH /api/auth/password
+    if (path === "/api/auth/password" && method === "PATCH") {
+      const { currentPassword, newPassword } = parseBody(event) as { currentPassword: string; newPassword: string };
+
+      if (!currentPassword || !newPassword) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "currentPassword and newPassword are required" }) };
+      }
+      if (newPassword.length < 8) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "new password must be at least 8 characters" }) };
+      }
+
+      const userRow = await findUserByEmail((await findUserById(userId))!.email);
+      if (!userRow) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: "user not found" }) };
+      }
+
+      const valid = await verifyPassword(currentPassword, userRow.password_hash);
+      if (!valid) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: "current password is incorrect" }) };
+      }
+
+      const newHash = await hashPassword(newPassword);
+      await updateUserPassword(userId, newHash);
+
+      return { statusCode: 200, headers, body: JSON.stringify({ message: "password updated" }) };
     }
 
     // DELETE /api/auth/account

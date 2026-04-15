@@ -1,5 +1,5 @@
 import { createServer } from "http";
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, deleteUser } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
 
@@ -127,6 +127,43 @@ const server = createServer(async (req, res) => {
       }
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(user));
+      return;
+    }
+
+    // PATCH /api/auth/password
+    if (url === "/api/auth/password" && req.method === "PATCH") {
+      const { currentPassword, newPassword } = JSON.parse(await readBody(req));
+
+      if (!currentPassword || !newPassword) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "currentPassword and newPassword are required" }));
+        return;
+      }
+      if (newPassword.length < 8) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "new password must be at least 8 characters" }));
+        return;
+      }
+
+      const userRow = await findUserByEmail((await findUserById(userId))!.email);
+      if (!userRow) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "user not found" }));
+        return;
+      }
+
+      const valid = await verifyPassword(currentPassword, userRow.password_hash);
+      if (!valid) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "current password is incorrect" }));
+        return;
+      }
+
+      const newHash = await hashPassword(newPassword);
+      await updateUserPassword(userId, newHash);
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ message: "password updated" }));
       return;
     }
 

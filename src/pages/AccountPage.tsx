@@ -1,12 +1,36 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
+import { changePassword } from '../auth'
 
 export function AccountPage() {
   const { user, logout, deleteAccount } = useAuth()
   const navigate = useNavigate()
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [pwError, setPwError] = useState('')
+  const [pwSuccess, setPwSuccess] = useState('')
+  const [pwSubmitting, setPwSubmitting] = useState(false)
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPwError('')
+    setPwSuccess('')
+    setPwSubmitting(true)
+    try {
+      await changePassword(currentPassword, newPassword)
+      setPwSuccess('パスワードを変更しました')
+      setCurrentPassword('')
+      setNewPassword('')
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : 'Failed')
+    } finally {
+      setPwSubmitting(false)
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -63,6 +87,52 @@ export function AccountPage() {
             </div>
           </dl>
         </div>
+
+        <form onSubmit={handleChangePassword} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">パスワード変更</h3>
+
+          {pwError && (
+            <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400 rounded-lg px-3 py-2">
+              {pwError}
+            </div>
+          )}
+          {pwSuccess && (
+            <div className="text-sm text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400 rounded-lg px-3 py-2">
+              {pwSuccess}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">現在のパスワード</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+              className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">新しいパスワード（8文字以上）</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={8}
+              className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={pwSubmitting}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+          >
+            {pwSubmitting ? '変更中...' : 'パスワードを変更'}
+          </button>
+        </form>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
           <button
