@@ -38,6 +38,10 @@ await sql`
 
 console.log("✅ users テーブルを作成しました");
 
+// usersテーブルに同意日時カラム追加
+await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_agreed_at TIMESTAMPTZ`;
+console.log("✅ users.terms_agreed_at カラムを追加しました");
+
 // tasksテーブルにuser_idカラム追加
 await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id)`;
 console.log("✅ tasks.user_id カラムを追加しました");

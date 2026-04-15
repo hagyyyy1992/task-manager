@@ -9,6 +9,7 @@ export function RegisterPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [termsAgreed, setTermsAgreed] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -17,7 +18,7 @@ export function RegisterPage() {
     setError('')
     setSubmitting(true)
     try {
-      await register(email, password, name)
+      await register(email, password, name, termsAgreed)
       navigate('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
@@ -68,10 +69,22 @@ export function RegisterPage() {
 
           <PasswordInput label="パスワード（8文字以上）" value={password} onChange={setPassword} required minLength={8} autoComplete="new-password" />
 
+          <label className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={termsAgreed}
+              onChange={(e) => setTermsAgreed(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 dark:border-gray-600"
+            />
+            <span>
+              <Link to="/terms" className="text-blue-600 hover:underline">利用規約</Link>および<Link to="/privacy" className="text-blue-600 hover:underline">プライバシーポリシー</Link>に同意します
+            </span>
+          </label>
+
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+            disabled={submitting || !termsAgreed}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? '登録中...' : '登録'}
           </button>
