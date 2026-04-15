@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { Task, TaskStatus, TaskCategory } from './types'
-import { CATEGORIES } from './types'
-import { loadTasks, apiCreateTask, apiUpdateTask, apiDeleteTask } from './store'
+import type { Task, TaskStatus, Category } from './types'
+import { loadTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, loadCategories } from './store'
 import { TaskForm } from './components/TaskForm'
 import { TaskItem } from './components/TaskItem'
 import { AppHeader } from './components/AppHeader'
@@ -20,14 +19,14 @@ import {
 import './index.css'
 
 type FilterStatus = TaskStatus | 'all'
-type FilterCategory = TaskCategory | 'all'
 type SortKey = 'manual' | 'priority' | 'dueDate' | 'category' | 'createdAt'
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
-  const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
+  const [filterCategory, setFilterCategory] = useState<string>('all')
   const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [searchText, setSearchText] = useState('')
 
@@ -39,6 +38,9 @@ function App() {
     let cancelled = false
     loadTasks().then((data) => {
       if (!cancelled) setTasks(data)
+    }).catch(console.error)
+    loadCategories().then((data) => {
+      if (!cancelled) setCategories(data)
     }).catch(console.error)
     return () => { cancelled = true }
   }, [])
@@ -160,7 +162,10 @@ function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <AppHeader>
         <button
-          onClick={() => loadTasks().then(setTasks).catch(console.error)}
+          onClick={() => {
+            loadTasks().then(setTasks).catch(console.error)
+            loadCategories().then(setCategories).catch(console.error)
+          }}
           className="px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-sm"
           title="更新"
         >
@@ -213,12 +218,12 @@ function App() {
 
           <select
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value as FilterCategory)}
+            onChange={(e) => setFilterCategory(e.target.value)}
             className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1 text-sm text-gray-600 dark:text-gray-400 shadow-sm"
           >
             <option value="all">全カテゴリ</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
             ))}
           </select>
 
@@ -270,6 +275,8 @@ function App() {
         <TaskForm
           onAdd={addTask}
           onClose={() => setShowForm(false)}
+          categories={categories}
+          onCategoryCreated={(cat) => setCategories((prev) => [...prev, cat])}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
 
@@ -153,6 +153,49 @@ export const handler = async (event: LambdaEvent) => {
       }
       return { statusCode: 200, headers, body: JSON.stringify({ message: "account deleted" }) };
     }
+
+    // ─── Categories ───────────────────────────────────────────────────
+
+    // GET /api/categories
+    if (path === "/api/categories" && method === "GET") {
+      const categories = await loadCategories(userId);
+      return { statusCode: 200, headers, body: JSON.stringify(categories) };
+    }
+
+    // POST /api/categories
+    if (path === "/api/categories" && method === "POST") {
+      const { name, sortOrder } = parseBody(event) as { name: string; sortOrder?: number };
+      if (!name || !name.trim()) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "name is required" }) };
+      }
+      const category = await createCategory(userId, name.trim(), sortOrder);
+      return { statusCode: 201, headers, body: JSON.stringify(category) };
+    }
+
+    // PATCH /api/categories/:id
+    const categoryPatchMatch = path.match(/^\/api\/categories\/(.+)$/);
+    if (categoryPatchMatch && method === "PATCH") {
+      const id = categoryPatchMatch[1];
+      const updates = parseBody(event) as { name?: string; sortOrder?: number };
+      const updated = await updateCategory(id, updates);
+      if (!updated) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: "not found" }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify(updated) };
+    }
+
+    // DELETE /api/categories/:id
+    const categoryDeleteMatch = path.match(/^\/api\/categories\/(.+)$/);
+    if (categoryDeleteMatch && method === "DELETE") {
+      const id = categoryDeleteMatch[1];
+      const deleted = await deleteCategory(id);
+      if (!deleted) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: "not found" }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ message: "deleted" }) };
+    }
+
+    // ─── Tasks ────────────────────────────────────────────────────────
 
     // GET /api/tasks
     if (path === "/api/tasks" && method === "GET") {

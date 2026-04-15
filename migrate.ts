@@ -56,6 +56,41 @@ if (seedUser.length > 0) {
   console.log("   → アカウント登録後にもう一度 migrate.ts を実行してください");
 }
 
+// カテゴリテーブル作成
+await sql`
+  CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, name)
+  )
+`;
+console.log("✅ categories テーブルを作成しました");
+
+// 既存ユーザーにデフォルトカテゴリを挿入
+const DEFAULT_CATEGORIES = [
+  { name: "決算・税務", sortOrder: 0 },
+  { name: "案件・営業", sortOrder: 1 },
+  { name: "プロダクト開発", sortOrder: 2 },
+  { name: "事務・手続き", sortOrder: 3 },
+  { name: "その他", sortOrder: 4 },
+];
+
+const allUsers = await sql`SELECT id FROM users`;
+for (const user of allUsers) {
+  for (const cat of DEFAULT_CATEGORIES) {
+    const catId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    await sql`
+      INSERT INTO categories (id, user_id, name, sort_order)
+      VALUES (${catId}, ${user.id}, ${cat.name}, ${cat.sortOrder})
+      ON CONFLICT (user_id, name) DO NOTHING
+    `;
+  }
+}
+console.log(`✅ ${allUsers.length}ユーザーにデフォルトカテゴリを挿入しました`);
+
 // 既存JSONデータの移行
 if (existsSync(DATA_FILE)) {
   const tasks = JSON.parse(readFileSync(DATA_FILE, "utf-8"));

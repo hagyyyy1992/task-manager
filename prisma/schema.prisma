@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String     @id
+  email           String     @unique
+  name            String
+  passwordHash    String     @map("password_hash")
+  termsAgreedAt   DateTime?  @map("terms_agreed_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  tasks           Task[]
+  categories      Category[]
+
+  @@map("users")
+}
+
+model Task {
+  id        String    @id
+  userId    String?   @map("user_id")
+  title     String
+  status    String    @default("todo")
+  priority  String    @default("medium")
+  category  String    @default("その他")
+  dueDate   DateTime? @map("due_date") @db.Date
+  memo      String    @default("")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@map("categories")
+}

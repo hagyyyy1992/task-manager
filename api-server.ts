@@ -1,5 +1,5 @@
 import { createServer } from "http";
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
 
@@ -185,6 +185,62 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ message: "account deleted" }));
       return;
     }
+
+    // ─── Categories ───────────────────────────────────────────────────
+
+    // GET /api/categories
+    if (url === "/api/categories" && req.method === "GET") {
+      const categories = await loadCategories(userId);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(categories));
+      return;
+    }
+
+    // POST /api/categories
+    if (url === "/api/categories" && req.method === "POST") {
+      const { name, sortOrder } = JSON.parse(await readBody(req));
+      if (!name || !name.trim()) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "name is required" }));
+        return;
+      }
+      const category = await createCategory(userId, name.trim(), sortOrder);
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(category));
+      return;
+    }
+
+    // PATCH /api/categories/:id
+    const categoryPatchMatch = url.match(/^\/api\/categories\/(.+)$/);
+    if (categoryPatchMatch && req.method === "PATCH") {
+      const body = await readBody(req);
+      const updates = JSON.parse(body);
+      const updated = await updateCategory(categoryPatchMatch[1], updates);
+      if (!updated) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(updated));
+      return;
+    }
+
+    // DELETE /api/categories/:id
+    const categoryDeleteMatch = url.match(/^\/api\/categories\/(.+)$/);
+    if (categoryDeleteMatch && req.method === "DELETE") {
+      const deleted = await deleteCategory(categoryDeleteMatch[1]);
+      if (!deleted) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ message: "deleted" }));
+      return;
+    }
+
+    // ─── Tasks ────────────────────────────────────────────────────────
 
     // GET /api/tasks
     if (url === "/api/tasks" && req.method === "GET") {

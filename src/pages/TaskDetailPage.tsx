@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
-import type { Task, TaskStatus, TaskPriority, TaskCategory } from '../types'
-import { CATEGORIES } from '../types'
-import { loadTask, apiUpdateTask, apiDeleteTask } from '../store'
+import type { Task, TaskStatus, TaskPriority, Category } from '../types'
+import { loadTask, apiUpdateTask, apiDeleteTask, loadCategories } from '../store'
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: '未着手',
@@ -33,13 +32,14 @@ export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [task, setTask] = useState<Task | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
 
   const [title, setTitle] = useState('')
   const [status, setStatus] = useState<TaskStatus>('todo')
   const [priority, setPriority] = useState<TaskPriority>('medium')
-  const [category, setCategory] = useState<TaskCategory>('その他')
+  const [category, setCategory] = useState<string>('その他')
   const [dueDate, setDueDate] = useState('')
   const [memo, setMemo] = useState('')
 
@@ -59,6 +59,9 @@ export function TaskDetailPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false))
+    loadCategories()
+      .then(setCategories)
+      .catch(console.error)
   }, [id])
 
   const handleSave = async () => {
@@ -180,12 +183,15 @@ export function TaskDetailPage() {
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">カテゴリ</label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value as TaskCategory)}
+                  onChange={(e) => setCategory(e.target.value)}
                   className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
+                  {categories.length === 0 && (
+                    <option value={category}>{category}</option>
+                  )}
                 </select>
               </div>
 
@@ -217,7 +223,7 @@ export function TaskDetailPage() {
                   setTitle(task.title)
                   setStatus(task.status)
                   setPriority(task.priority)
-                  setCategory(task.category)
+                  setCategory(task.category as string)
                   setDueDate(task.dueDate ?? '')
                   setMemo(task.memo)
                 }}
