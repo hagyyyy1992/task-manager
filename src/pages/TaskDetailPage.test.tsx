@@ -27,7 +27,7 @@ const mockTask = {
   title: 'テストタスク',
   status: 'todo' as const,
   priority: 'medium' as const,
-  category: 'その他',
+  category: 'その他' as const,
   dueDate: '2026-05-01',
   memo: 'メモです',
   createdAt: '2026-01-01T00:00:00.000Z',
