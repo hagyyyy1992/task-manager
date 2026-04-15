@@ -7,6 +7,7 @@ interface Props {
   required?: boolean
   minLength?: number
   autoFocus?: boolean
+  autoComplete?: string
 }
 
 function EyeIcon() {
@@ -27,7 +28,7 @@ function EyeOffIcon() {
   )
 }
 
-export function PasswordInput({ value, onChange, label, required, minLength, autoFocus }: Props) {
+export function PasswordInput({ value, onChange, label, required, minLength, autoFocus, autoComplete }: Props) {
   const [show, setShow] = useState(false)
 
   return (
@@ -41,6 +42,7 @@ export function PasswordInput({ value, onChange, label, required, minLength, aut
           required={required}
           minLength={minLength}
           autoFocus={autoFocus}
+          autoComplete={autoComplete}
           className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 pr-10 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button

@@ -95,8 +95,8 @@ export function AccountPage() {
             </div>
           )}
 
-          <PasswordInput label="現在のパスワード" value={currentPassword} onChange={setCurrentPassword} required />
-          <PasswordInput label="新しいパスワード（8文字以上）" value={newPassword} onChange={setNewPassword} required minLength={8} />
+          <PasswordInput label="現在のパスワード" value={currentPassword} onChange={setCurrentPassword} required autoComplete="current-password" />
+          <PasswordInput label="新しいパスワード（8文字以上）" value={newPassword} onChange={setNewPassword} required minLength={8} autoComplete="new-password" />
 
           <button
             type="submit"
