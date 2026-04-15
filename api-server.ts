@@ -145,7 +145,7 @@ const server = createServer(async (req, res) => {
 
     // GET /api/tasks
     if (url === "/api/tasks" && req.method === "GET") {
-      const tasks = await loadTasks();
+      const tasks = await loadTasks({ userId });
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(tasks));
       return;
@@ -155,7 +155,7 @@ const server = createServer(async (req, res) => {
     if (url === "/api/tasks" && req.method === "POST") {
       const body = await readBody(req);
       const task = JSON.parse(body) as Task;
-      await createTask(task);
+      await createTask(task, userId);
       res.writeHead(201, { "Content-Type": "application/json" });
       res.end(JSON.stringify(task));
       return;

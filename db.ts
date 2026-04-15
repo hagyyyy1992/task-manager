@@ -42,6 +42,7 @@ interface DbRow {
   category: string;
   due_date: string | null;
   memo: string;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,9 +64,20 @@ function rowToTask(row: DbRow): Task {
 export async function loadTasks(filters?: {
   status?: string;
   category?: string;
+  userId?: string;
 }): Promise<Task[]> {
   let rows: DbRow[];
-  if (filters?.status && filters?.category) {
+  const userId = filters?.userId;
+
+  if (userId && filters?.status && filters?.category) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} AND status = ${filters.status} AND category = ${filters.category} ORDER BY created_at DESC`) as DbRow[];
+  } else if (userId && filters?.status) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} AND status = ${filters.status} ORDER BY created_at DESC`) as DbRow[];
+  } else if (userId && filters?.category) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} AND category = ${filters.category} ORDER BY created_at DESC`) as DbRow[];
+  } else if (userId) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} ORDER BY created_at DESC`) as DbRow[];
+  } else if (filters?.status && filters?.category) {
     rows = (await sql`SELECT * FROM tasks WHERE status = ${filters.status} AND category = ${filters.category} ORDER BY created_at DESC`) as DbRow[];
   } else if (filters?.status) {
     rows = (await sql`SELECT * FROM tasks WHERE status = ${filters.status} ORDER BY created_at DESC`) as DbRow[];
@@ -77,10 +89,10 @@ export async function loadTasks(filters?: {
   return rows.map(rowToTask);
 }
 
-export async function createTask(task: Task): Promise<void> {
+export async function createTask(task: Task, userId?: string): Promise<void> {
   await sql`
-    INSERT INTO tasks (id, title, status, priority, category, due_date, memo, created_at, updated_at)
-    VALUES (${task.id}, ${task.title}, ${task.status}, ${task.priority}, ${task.category}, ${task.dueDate}, ${task.memo}, ${task.createdAt}, ${task.updatedAt})
+    INSERT INTO tasks (id, title, status, priority, category, due_date, memo, user_id, created_at, updated_at)
+    VALUES (${task.id}, ${task.title}, ${task.status}, ${task.priority}, ${task.category}, ${task.dueDate}, ${task.memo}, ${userId ?? null}, ${task.createdAt}, ${task.updatedAt})
   `;
 }
 

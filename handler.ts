@@ -125,14 +125,14 @@ export const handler = async (event: LambdaEvent) => {
 
     // GET /api/tasks
     if (path === "/api/tasks" && method === "GET") {
-      const tasks = await loadTasks();
+      const tasks = await loadTasks({ userId });
       return { statusCode: 200, headers, body: JSON.stringify(tasks) };
     }
 
     // POST /api/tasks
     if (path === "/api/tasks" && method === "POST") {
       const task = parseBody(event) as Task;
-      await createTask(task);
+      await createTask(task, userId);
       return { statusCode: 201, headers, body: JSON.stringify(task) };
     }
 

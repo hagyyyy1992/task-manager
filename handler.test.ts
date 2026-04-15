@@ -65,7 +65,7 @@ describe("handler", () => {
     vi.mocked(createTask).mockResolvedValue();
     const res = await handler(event("POST", "/api/tasks", mockTask));
     expect(res.statusCode).toBe(201);
-    expect(createTask).toHaveBeenCalledWith(mockTask);
+    expect(createTask).toHaveBeenCalledWith(mockTask, "user123");
   });
 
   it("PATCH /api/tasks/:id updates a task", async () => {
@@ -112,7 +112,7 @@ describe("handler", () => {
       isBase64Encoded: true,
     });
     expect(res.statusCode).toBe(201);
-    expect(createTask).toHaveBeenCalledWith(mockTask);
+    expect(createTask).toHaveBeenCalledWith(mockTask, "user123");
   });
 
   it("returns 500 on db error", async () => {
