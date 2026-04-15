@@ -1,6 +1,5 @@
 import { PrismaClient } from "./src/generated/prisma/client.js";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { neon } from "@neondatabase/serverless";
 import { readFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -18,8 +17,9 @@ if (existsSync(envFile)) {
   }
 }
 
-const sql = neon(process.env.DATABASE_URL!);
-const adapter = new PrismaNeon(sql);
+const adapter = new PrismaNeon({
+  connectionString: process.env.DATABASE_URL!,
+});
 export const prisma = new PrismaClient({ adapter });
 
 export interface Task {
