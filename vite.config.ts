@@ -5,6 +5,10 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   appType: 'spa',
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test-setup.ts'],
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:3456',

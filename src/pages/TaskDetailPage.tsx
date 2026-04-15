@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { AppHeader } from '../components/AppHeader'
 import type { Task, TaskStatus, TaskPriority, TaskCategory } from '../types'
 import { CATEGORIES } from '../types'
 import { loadTask, apiUpdateTask, apiDeleteTask } from '../store'
@@ -117,34 +118,24 @@ export function TaskDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm flex items-center gap-1"
-          >
-            ← 一覧
-          </Link>
-          <div className="flex gap-2">
-            {!editing && (
-              <>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-sm font-medium"
-                >
-                  編集
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-sm font-medium"
-                >
-                  削除
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      <AppHeader>
+        {!editing && (
+          <>
+            <button
+              onClick={() => setEditing(true)}
+              className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-sm font-medium"
+            >
+              編集
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-3 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-sm font-medium"
+            >
+              削除
+            </button>
+          </>
+        )}
+      </AppHeader>
 
       <main className="max-w-2xl mx-auto px-4 py-6">
         {editing ? (

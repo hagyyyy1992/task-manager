@@ -4,6 +4,7 @@ import { CATEGORIES } from './types'
 import { loadTasks, apiCreateTask, apiUpdateTask, apiDeleteTask } from './store'
 import { TaskForm } from './components/TaskForm'
 import { TaskItem } from './components/TaskItem'
+import { AppHeader } from './components/AppHeader'
 import {
   DndContext,
   closestCenter,
@@ -157,26 +158,21 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">Task Manager</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => loadTasks().then(setTasks).catch(console.error)}
-              className="px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-sm"
-              title="更新"
-            >
-              ↻
-            </button>
-            <button
-              onClick={() => setShowForm(true)}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-            >
-              + 追加
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppHeader>
+        <button
+          onClick={() => loadTasks().then(setTasks).catch(console.error)}
+          className="px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-sm"
+          title="更新"
+        >
+          ↻
+        </button>
+        <button
+          onClick={() => setShowForm(true)}
+          className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+        >
+          + 追加
+        </button>
+      </AppHeader>
 
       <main className="max-w-3xl mx-auto px-4 py-4">
         {/* Search */}

@@ -25,6 +25,33 @@ await sql`
 
 console.log("✅ tasks テーブルを作成しました");
 
+await sql`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )
+`;
+
+console.log("✅ users テーブルを作成しました");
+
+// tasksテーブルにuser_idカラム追加
+await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id)`;
+console.log("✅ tasks.user_id カラムを追加しました");
+
+// 既存タスクをkeiichi.hagiwara.1992@gmail.comユーザーに紐付け
+const seedUser = await sql`SELECT id FROM users WHERE email = 'keiichi.hagiwara.1992@gmail.com'`;
+if (seedUser.length > 0) {
+  const result = await sql`UPDATE tasks SET user_id = ${seedUser[0].id} WHERE user_id IS NULL`;
+  console.log(`✅ 既存タスクをユーザーに紐付けました（${result.length ?? 0}件）`);
+} else {
+  console.log("ℹ️ keiichi.hagiwara.1992@gmail.com ユーザーが未登録のため紐付けスキップ");
+  console.log("   → アカウント登録後にもう一度 migrate.ts を実行してください");
+}
+
 // 既存JSONデータの移行
 if (existsSync(DATA_FILE)) {
   const tasks = JSON.parse(readFileSync(DATA_FILE, "utf-8"));

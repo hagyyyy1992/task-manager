@@ -42,6 +42,7 @@ interface DbRow {
   category: string;
   due_date: string | null;
   memo: string;
+  user_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,9 +64,20 @@ function rowToTask(row: DbRow): Task {
 export async function loadTasks(filters?: {
   status?: string;
   category?: string;
+  userId?: string;
 }): Promise<Task[]> {
   let rows: DbRow[];
-  if (filters?.status && filters?.category) {
+  const userId = filters?.userId;
+
+  if (userId && filters?.status && filters?.category) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} AND status = ${filters.status} AND category = ${filters.category} ORDER BY created_at DESC`) as DbRow[];
+  } else if (userId && filters?.status) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} AND status = ${filters.status} ORDER BY created_at DESC`) as DbRow[];
+  } else if (userId && filters?.category) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} AND category = ${filters.category} ORDER BY created_at DESC`) as DbRow[];
+  } else if (userId) {
+    rows = (await sql`SELECT * FROM tasks WHERE user_id = ${userId} ORDER BY created_at DESC`) as DbRow[];
+  } else if (filters?.status && filters?.category) {
     rows = (await sql`SELECT * FROM tasks WHERE status = ${filters.status} AND category = ${filters.category} ORDER BY created_at DESC`) as DbRow[];
   } else if (filters?.status) {
     rows = (await sql`SELECT * FROM tasks WHERE status = ${filters.status} ORDER BY created_at DESC`) as DbRow[];
@@ -77,10 +89,10 @@ export async function loadTasks(filters?: {
   return rows.map(rowToTask);
 }
 
-export async function createTask(task: Task): Promise<void> {
+export async function createTask(task: Task, userId?: string): Promise<void> {
   await sql`
-    INSERT INTO tasks (id, title, status, priority, category, due_date, memo, created_at, updated_at)
-    VALUES (${task.id}, ${task.title}, ${task.status}, ${task.priority}, ${task.category}, ${task.dueDate}, ${task.memo}, ${task.createdAt}, ${task.updatedAt})
+    INSERT INTO tasks (id, title, status, priority, category, due_date, memo, user_id, created_at, updated_at)
+    VALUES (${task.id}, ${task.title}, ${task.status}, ${task.priority}, ${task.category}, ${task.dueDate}, ${task.memo}, ${userId ?? null}, ${task.createdAt}, ${task.updatedAt})
   `;
 }
 
@@ -119,5 +131,70 @@ export async function deleteTask(id: string): Promise<Task | null> {
   const task = rowToTask(rows[0]);
   await sql`DELETE FROM tasks WHERE id = ${id}`;
   return task;
+}
+
+// ─── Users ──────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface UserDbRow {
+  id: string;
+  email: string;
+  name: string;
+  password_hash: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToUser(row: UserDbRow): User {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function findUserByEmail(email: string): Promise<UserDbRow | null> {
+  const rows = (await sql`SELECT * FROM users WHERE email = ${email}`) as UserDbRow[];
+  return rows[0] ?? null;
+}
+
+export async function findUserById(id: string): Promise<User | null> {
+  const rows = (await sql`SELECT * FROM users WHERE id = ${id}`) as UserDbRow[];
+  if (rows.length === 0) return null;
+  return rowToUser(rows[0]);
+}
+
+export async function createUser(id: string, email: string, name: string, passwordHash: string): Promise<User> {
+  const now = new Date().toISOString();
+  await sql`
+    INSERT INTO users (id, email, name, password_hash, created_at, updated_at)
+    VALUES (${id}, ${email}, ${name}, ${passwordHash}, ${now}, ${now})
+  `;
+  return { id, email, name, createdAt: now, updatedAt: now };
+}
+
+export async function updateUserPassword(id: string, passwordHash: string): Promise<boolean> {
+  const rows = (await sql`SELECT id FROM users WHERE id = ${id}`) as { id: string }[];
+  if (rows.length === 0) return false;
+  const now = new Date().toISOString();
+  await sql`UPDATE users SET password_hash = ${passwordHash}, updated_at = ${now} WHERE id = ${id}`;
+  return true;
+}
+
+export async function deleteUser(id: string): Promise<boolean> {
+  const rows = (await sql`SELECT id FROM users WHERE id = ${id}`) as { id: string }[];
+  if (rows.length === 0) return false;
+  await sql`DELETE FROM tasks WHERE user_id = ${id}`;
+  await sql`DELETE FROM users WHERE id = ${id}`;
+  return true;
 }
 
