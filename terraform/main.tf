@@ -223,7 +223,7 @@ resource "aws_cloudfront_distribution" "main" {
 
     forwarded_values {
       query_string = false
-      headers      = ["Content-Type"]
+      headers      = ["Content-Type", "Authorization"]
       cookies { forward = "none" }
     }
 
