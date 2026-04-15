@@ -1,12 +1,22 @@
 @import "tailwindcss";
 
-/* ブラウザオートフィル時のダークモード背景色修正 */
+/* ブラウザ・拡張機能オートフィル時のダークモード背景色修正 */
 @media (prefers-color-scheme: dark) {
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus {
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 9999px #374151 inset !important;
     -webkit-text-fill-color: #f3f4f6 !important;
     caret-color: #f3f4f6 !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+  }
+}
+
+/* 1Password等の拡張機能がinlineスタイルで白背景を設定する対策 */
+@media (prefers-color-scheme: dark) {
+  input[style*="background-color"] {
+    background-color: #374151 !important;
+    color: #f3f4f6 !important;
   }
 }
