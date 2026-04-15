@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import { changePassword } from '../auth'
 import { PasswordInput } from '../components/PasswordInput'
+import { AppHeader } from '../components/AppHeader'
 
 export function AccountPage() {
   const { user, logout, deleteAccount } = useAuth()
@@ -57,16 +58,7 @@ export function AccountPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm flex items-center gap-1"
-          >
-            ← 一覧
-          </Link>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
