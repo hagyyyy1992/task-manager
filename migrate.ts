@@ -25,6 +25,19 @@ await sql`
 
 console.log("✅ tasks テーブルを作成しました");
 
+await sql`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )
+`;
+
+console.log("✅ users テーブルを作成しました");
+
 // 既存JSONデータの移行
 if (existsSync(DATA_FILE)) {
   const tasks = JSON.parse(readFileSync(DATA_FILE, "utf-8"));

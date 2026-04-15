@@ -121,3 +121,59 @@ export async function deleteTask(id: string): Promise<Task | null> {
   return task;
 }
 
+// ─── Users ──────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface UserDbRow {
+  id: string;
+  email: string;
+  name: string;
+  password_hash: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToUser(row: UserDbRow): User {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function findUserByEmail(email: string): Promise<UserDbRow | null> {
+  const rows = (await sql`SELECT * FROM users WHERE email = ${email}`) as UserDbRow[];
+  return rows[0] ?? null;
+}
+
+export async function findUserById(id: string): Promise<User | null> {
+  const rows = (await sql`SELECT * FROM users WHERE id = ${id}`) as UserDbRow[];
+  if (rows.length === 0) return null;
+  return rowToUser(rows[0]);
+}
+
+export async function createUser(id: string, email: string, name: string, passwordHash: string): Promise<User> {
+  const now = new Date().toISOString();
+  await sql`
+    INSERT INTO users (id, email, name, password_hash, created_at, updated_at)
+    VALUES (${id}, ${email}, ${name}, ${passwordHash}, ${now}, ${now})
+  `;
+  return { id, email, name, createdAt: now, updatedAt: now };
+}
+
+export async function deleteUser(id: string): Promise<boolean> {
+  const rows = (await sql`SELECT id FROM users WHERE id = ${id}`) as { id: string }[];
+  if (rows.length === 0) return false;
+  await sql`DELETE FROM users WHERE id = ${id}`;
+  return true;
+}
+

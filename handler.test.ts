@@ -6,6 +6,17 @@ vi.mock("./db.js", () => ({
   createTask: vi.fn(),
   updateTask: vi.fn(),
   deleteTask: vi.fn(),
+  findUserByEmail: vi.fn(),
+  findUserById: vi.fn(),
+  createUser: vi.fn(),
+  deleteUser: vi.fn(),
+}));
+
+vi.mock("./auth.js", () => ({
+  hashPassword: vi.fn().mockResolvedValue("hashed"),
+  verifyPassword: vi.fn().mockResolvedValue(true),
+  createToken: vi.fn().mockResolvedValue("test-token"),
+  verifyToken: vi.fn().mockResolvedValue("user123"),
 }));
 
 import { loadTasks, createTask, updateTask, deleteTask } from "./db.js";
@@ -23,10 +34,11 @@ const mockTask: Task = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
-function event(method: string, path: string, body?: unknown): Parameters<typeof handler>[0] {
+function event(method: string, path: string, body?: unknown, authenticated = true): Parameters<typeof handler>[0] {
   return {
     requestContext: { http: { method } },
     rawPath: path,
+    headers: authenticated ? { authorization: "Bearer test-token" } : {},
     body: body ? JSON.stringify(body) : undefined,
     isBase64Encoded: false,
   };
@@ -95,6 +107,7 @@ describe("handler", () => {
     const res = await handler({
       requestContext: { http: { method: "POST" } },
       rawPath: "/api/tasks",
+      headers: { authorization: "Bearer test-token" },
       body,
       isBase64Encoded: true,
     });

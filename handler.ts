@@ -1,16 +1,18 @@
-import { loadTasks, createTask, updateTask, deleteTask } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, deleteUser } from "./db.js";
 import type { Task } from "./db.js";
+import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
 
 const headers = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 interface LambdaEvent {
   requestContext: { http: { method: string } };
   rawPath: string;
+  headers?: Record<string, string>;
   body?: string;
   isBase64Encoded?: boolean;
 }
@@ -22,29 +24,120 @@ function parseBody(event: LambdaEvent): unknown {
   return raw ? JSON.parse(raw) : {};
 }
 
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function getToken(event: LambdaEvent): string | null {
+  const auth = event.headers?.authorization || event.headers?.Authorization;
+  if (!auth?.startsWith("Bearer ")) return null;
+  return auth.slice(7);
+}
+
 export const handler = async (event: LambdaEvent) => {
   const method = event.requestContext.http.method;
+  const path = event.rawPath;
 
   if (method === "OPTIONS") {
     return { statusCode: 204, headers, body: "" };
   }
 
   try {
-    // GET /api/tasks — list all tasks
-    if (event.rawPath === "/api/tasks" && method === "GET") {
+    // ─── Auth endpoints (public) ──────────────────────────────────────
+
+    // POST /api/auth/register
+    if (path === "/api/auth/register" && method === "POST") {
+      const { email, password, name } = parseBody(event) as { email: string; password: string; name: string };
+
+      if (!email || !password || !name) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "email, password, name are required" }) };
+      }
+      if (password.length < 8) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "password must be at least 8 characters" }) };
+      }
+
+      const existing = await findUserByEmail(email);
+      if (existing) {
+        return { statusCode: 409, headers, body: JSON.stringify({ error: "email already registered" }) };
+      }
+
+      const id = generateId();
+      const passwordHash = await hashPassword(password);
+      const user = await createUser(id, email, name, passwordHash);
+      const token = await createToken(user.id);
+
+      return { statusCode: 201, headers, body: JSON.stringify({ user, token }) };
+    }
+
+    // POST /api/auth/login
+    if (path === "/api/auth/login" && method === "POST") {
+      const { email, password } = parseBody(event) as { email: string; password: string };
+
+      if (!email || !password) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: "email and password are required" }) };
+      }
+
+      const userRow = await findUserByEmail(email);
+      if (!userRow) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: "invalid credentials" }) };
+      }
+
+      const valid = await verifyPassword(password, userRow.password_hash);
+      if (!valid) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: "invalid credentials" }) };
+      }
+
+      const token = await createToken(userRow.id);
+      const user = { id: userRow.id, email: userRow.email, name: userRow.name, createdAt: userRow.created_at, updatedAt: userRow.updated_at };
+
+      return { statusCode: 200, headers, body: JSON.stringify({ user, token }) };
+    }
+
+    // ─── Protected endpoints ──────────────────────────────────────────
+
+    const token = getToken(event);
+    if (!token) {
+      return { statusCode: 401, headers, body: JSON.stringify({ error: "authentication required" }) };
+    }
+
+    const userId = await verifyToken(token);
+    if (!userId) {
+      return { statusCode: 401, headers, body: JSON.stringify({ error: "invalid or expired token" }) };
+    }
+
+    // GET /api/auth/me
+    if (path === "/api/auth/me" && method === "GET") {
+      const user = await findUserById(userId);
+      if (!user) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: "user not found" }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify(user) };
+    }
+
+    // DELETE /api/auth/account
+    if (path === "/api/auth/account" && method === "DELETE") {
+      const deleted = await deleteUser(userId);
+      if (!deleted) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: "user not found" }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ message: "account deleted" }) };
+    }
+
+    // GET /api/tasks
+    if (path === "/api/tasks" && method === "GET") {
       const tasks = await loadTasks();
       return { statusCode: 200, headers, body: JSON.stringify(tasks) };
     }
 
-    // POST /api/tasks — create a task
-    if (event.rawPath === "/api/tasks" && method === "POST") {
+    // POST /api/tasks
+    if (path === "/api/tasks" && method === "POST") {
       const task = parseBody(event) as Task;
       await createTask(task);
       return { statusCode: 201, headers, body: JSON.stringify(task) };
     }
 
-    // PATCH /api/tasks/:id — update a task
-    const patchMatch = event.rawPath.match(/^\/api\/tasks\/(.+)$/);
+    // PATCH /api/tasks/:id
+    const patchMatch = path.match(/^\/api\/tasks\/(.+)$/);
     if (patchMatch && method === "PATCH") {
       const id = patchMatch[1];
       const updates = parseBody(event) as Partial<Pick<Task, "status" | "priority" | "title" | "memo" | "dueDate">>;
@@ -55,8 +148,8 @@ export const handler = async (event: LambdaEvent) => {
       return { statusCode: 200, headers, body: JSON.stringify(updated) };
     }
 
-    // DELETE /api/tasks/:id — delete a task
-    const deleteMatch = event.rawPath.match(/^\/api\/tasks\/(.+)$/);
+    // DELETE /api/tasks/:id
+    const deleteMatch = path.match(/^\/api\/tasks\/(.+)$/);
     if (deleteMatch && method === "DELETE") {
       const id = deleteMatch[1];
       const deleted = await deleteTask(id);
