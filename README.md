@@ -1,6 +1,8 @@
-# task-app
+# task-manager
 
-個人タスク管理アプリ。React フロントエンド + Node.js API サーバー + MCP サーバーの3層構成で、Neon PostgreSQL をバックエンドに使用することで複数端末間でタスクを同期できる。
+自分用のタスク管理アプリ。（Claude Codeのセッション記憶に任せるのが面倒がきっかけで自分用に作ったので本当に使ってる。）
+React フロントエンド + Node.js API サーバー + MCP サーバーの3層構成。
+Neon PostgreSQL をバックエンドに使用することで複数端末間でタスクを同期できる。
 
 アプリURL: 
 https://d3pi0juuilndgb.cloudfront.net
