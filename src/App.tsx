@@ -25,7 +25,6 @@ type SortKey = 'manual' | 'priority' | 'dueDate' | 'category' | 'createdAt'
 function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | undefined>()
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all')
   const [sortKey, setSortKey] = useState<SortKey>('priority')
@@ -50,22 +49,6 @@ function App() {
     } catch (e) {
       console.error(e)
       setTasks((prev) => prev.filter((t) => t.id !== task.id))
-    }
-  }, [])
-
-  const updateTask = useCallback(async (updated: Task) => {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
-    try {
-      await apiUpdateTask(updated.id, {
-        title: updated.title,
-        status: updated.status,
-        priority: updated.priority,
-        memo: updated.memo,
-        dueDate: updated.dueDate,
-      })
-    } catch (e) {
-      console.error(e)
-      loadTasks().then(setTasks).catch(console.error)
     }
   }, [])
 
@@ -186,10 +169,7 @@ function App() {
               ↻
             </button>
             <button
-              onClick={() => {
-                setEditingTask(undefined)
-                setShowForm(true)
-              }}
+              onClick={() => setShowForm(true)}
               className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
             >
               + 追加
@@ -280,10 +260,6 @@ function App() {
                     key={task.id}
                     task={task}
                     onStatusChange={changeStatus}
-                    onEdit={(t) => {
-                      setEditingTask(t)
-                      setShowForm(true)
-                    }}
                     onDelete={deleteTask}
                     isDraggable={sortKey === 'manual'}
                   />
@@ -297,12 +273,7 @@ function App() {
       {showForm && (
         <TaskForm
           onAdd={addTask}
-          onClose={() => {
-            setShowForm(false)
-            setEditingTask(undefined)
-          }}
-          editTask={editingTask}
-          onUpdate={updateTask}
+          onClose={() => setShowForm(false)}
         />
       )}
     </div>
