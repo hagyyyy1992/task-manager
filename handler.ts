@@ -47,6 +47,10 @@ export const handler = async (event: LambdaEvent) => {
 
     // POST /api/auth/register
     if (path === "/api/auth/register" && method === "POST") {
+      if (process.env.ALLOW_REGISTRATION !== "true") {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: "新規登録は現在受け付けていません" }) };
+      }
+
       const { email, password, name, termsAgreed } = parseBody(event) as { email: string; password: string; name: string; termsAgreed?: boolean };
 
       if (!email || !password || !name) {

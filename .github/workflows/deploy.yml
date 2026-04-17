@@ -35,6 +35,8 @@ jobs:
         run: npx tsx migrate.ts
 
       - name: Build frontend
+        env:
+          VITE_ALLOW_REGISTRATION: ${{ vars.ALLOW_REGISTRATION }}
         run: npm run build
 
       - name: Bundle Lambda
