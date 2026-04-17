@@ -11,6 +11,11 @@ vi.mock("./db.js", () => ({
   createUser: vi.fn(),
   updateUserPassword: vi.fn(),
   deleteUser: vi.fn(),
+  loadCategories: vi.fn(),
+  createCategory: vi.fn(),
+  updateCategory: vi.fn(),
+  deleteCategory: vi.fn(),
+  seedDefaultCategories: vi.fn(),
 }));
 
 vi.mock("./auth.js", () => ({
@@ -20,7 +25,7 @@ vi.mock("./auth.js", () => ({
   verifyToken: vi.fn().mockResolvedValue("user123"),
 }));
 
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory, seedDefaultCategories } from "./db.js";
 import { verifyPassword, verifyToken } from "./auth.js";
 import { handler } from "./handler.js";
 
@@ -182,6 +187,36 @@ describe("POST /api/auth/register", () => {
     expect(body.user.email).toBe("test@example.com");
     expect(body.token).toBe("test-token");
     expect(createUser).toHaveBeenCalled();
+  });
+
+  it("seeds default categories for a newly registered user", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+    vi.mocked(createUser).mockResolvedValue(mockUser);
+
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+      termsAgreed: true,
+    }, false));
+
+    expect(res.statusCode).toBe(201);
+    expect(seedDefaultCategories).toHaveBeenCalledWith(mockUser.id);
+    expect(seedDefaultCategories).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not seed categories when registration fails", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(mockUserRow);
+
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+      termsAgreed: true,
+    }, false));
+
+    expect(res.statusCode).toBe(409);
+    expect(seedDefaultCategories).not.toHaveBeenCalled();
   });
 
   it("returns 400 when fields are missing", async () => {
@@ -369,5 +404,98 @@ describe("DELETE /api/auth/account", () => {
 
     const res = await handler(event("DELETE", "/api/auth/account"));
     expect(res.statusCode).toBe(404);
+  });
+});
+
+// ─── カテゴリCRUDテスト ─────────────────────────────────────────
+
+const mockCategory = {
+  id: "cat123",
+  userId: "user123",
+  name: "決算・税務",
+  sortOrder: 0,
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("GET /api/categories", () => {
+  it("returns category list for authenticated user", async () => {
+    vi.mocked(loadCategories).mockResolvedValue([mockCategory]);
+    const res = await handler(event("GET", "/api/categories"));
+    expect(res.statusCode).toBe(200);
+    expect(loadCategories).toHaveBeenCalledWith("user123");
+    expect(JSON.parse(res.body)).toEqual([mockCategory]);
+  });
+
+  it("returns 401 without authentication", async () => {
+    const res = await handler(event("GET", "/api/categories", undefined, false));
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe("POST /api/categories", () => {
+  it("creates a category", async () => {
+    vi.mocked(createCategory).mockResolvedValue(mockCategory);
+    const res = await handler(event("POST", "/api/categories", { name: "決算・税務", sortOrder: 0 }));
+    expect(res.statusCode).toBe(201);
+    expect(createCategory).toHaveBeenCalledWith("user123", "決算・税務", 0);
+    expect(JSON.parse(res.body)).toEqual(mockCategory);
+  });
+
+  it("returns 400 when name is missing", async () => {
+    const res = await handler(event("POST", "/api/categories", { name: "" }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain("name is required");
+  });
+
+  it("returns 400 when name is whitespace only", async () => {
+    const res = await handler(event("POST", "/api/categories", { name: "   " }));
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 401 without authentication", async () => {
+    const res = await handler(event("POST", "/api/categories", { name: "テスト" }, false));
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe("PATCH /api/categories/:id", () => {
+  it("updates a category", async () => {
+    const updated = { ...mockCategory, name: "更新済み" };
+    vi.mocked(updateCategory).mockResolvedValue(updated);
+    const res = await handler(event("PATCH", "/api/categories/cat123", { name: "更新済み" }));
+    expect(res.statusCode).toBe(200);
+    expect(updateCategory).toHaveBeenCalledWith("cat123", { name: "更新済み" });
+    expect(JSON.parse(res.body).name).toBe("更新済み");
+  });
+
+  it("returns 404 for unknown id", async () => {
+    vi.mocked(updateCategory).mockResolvedValue(null);
+    const res = await handler(event("PATCH", "/api/categories/unknown", { name: "test" }));
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("returns 401 without authentication", async () => {
+    const res = await handler(event("PATCH", "/api/categories/cat123", { name: "test" }, false));
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe("DELETE /api/categories/:id", () => {
+  it("deletes a category", async () => {
+    vi.mocked(deleteCategory).mockResolvedValue(true);
+    const res = await handler(event("DELETE", "/api/categories/cat123"));
+    expect(res.statusCode).toBe(200);
+    expect(deleteCategory).toHaveBeenCalledWith("cat123");
+  });
+
+  it("returns 404 for unknown id", async () => {
+    vi.mocked(deleteCategory).mockResolvedValue(false);
+    const res = await handler(event("DELETE", "/api/categories/unknown"));
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("returns 401 without authentication", async () => {
+    const res = await handler(event("DELETE", "/api/categories/cat123", undefined, false));
+    expect(res.statusCode).toBe(401);
   });
 });
