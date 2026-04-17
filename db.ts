@@ -233,6 +233,24 @@ function dbCategoryToCategory(row: {
   };
 }
 
+export const DEFAULT_CATEGORIES: ReadonlyArray<{ name: string; sortOrder: number }> = [
+  { name: "決算・税務", sortOrder: 0 },
+  { name: "案件・営業", sortOrder: 1 },
+  { name: "プロダクト開発", sortOrder: 2 },
+  { name: "事務・手続き", sortOrder: 3 },
+  { name: "その他", sortOrder: 4 },
+];
+
+export async function seedDefaultCategories(userId: string): Promise<void> {
+  for (const cat of DEFAULT_CATEGORIES) {
+    await prisma.category.upsert({
+      where: { userId_name: { userId, name: cat.name } },
+      create: { userId, name: cat.name, sortOrder: cat.sortOrder },
+      update: {},
+    });
+  }
+}
+
 export async function loadCategories(userId: string): Promise<Category[]> {
   const rows = await prisma.category.findMany({
     where: { userId },

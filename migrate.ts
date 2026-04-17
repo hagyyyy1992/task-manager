@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { DEFAULT_CATEGORIES } from "./db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = join(__dirname, "data", "tasks.json");
@@ -70,14 +71,6 @@ await sql`
 console.log("✅ categories テーブルを作成しました");
 
 // 既存ユーザーにデフォルトカテゴリを挿入
-const DEFAULT_CATEGORIES = [
-  { name: "決算・税務", sortOrder: 0 },
-  { name: "案件・営業", sortOrder: 1 },
-  { name: "プロダクト開発", sortOrder: 2 },
-  { name: "事務・手続き", sortOrder: 3 },
-  { name: "その他", sortOrder: 4 },
-];
-
 const allUsers = await sql`SELECT id FROM users`;
 for (const user of allUsers) {
   for (const cat of DEFAULT_CATEGORIES) {
@@ -90,6 +83,35 @@ for (const user of allUsers) {
   }
 }
 console.log(`✅ ${allUsers.length}ユーザーにデフォルトカテゴリを挿入しました`);
+
+// 既存タスクに存在するがcategoriesに未登録のカテゴリ名を自動登録
+// （デフォルト5つの後ろに積む）
+let extraCount = 0;
+for (const user of allUsers) {
+  const taskCats = await sql`
+    SELECT DISTINCT category FROM tasks
+    WHERE user_id = ${user.id} AND category IS NOT NULL AND category <> ''
+  `;
+  const existing = await sql`SELECT name, sort_order FROM categories WHERE user_id = ${user.id}`;
+  const existingNames = new Set(existing.map((r) => r.name as string));
+  const maxOrder = existing.reduce((m, r) => Math.max(m, r.sort_order as number), -1);
+
+  let nextOrder = maxOrder + 1;
+  for (const row of taskCats) {
+    const name = row.category as string;
+    if (existingNames.has(name)) continue;
+    const catId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    await sql`
+      INSERT INTO categories (id, user_id, name, sort_order)
+      VALUES (${catId}, ${user.id}, ${name}, ${nextOrder})
+      ON CONFLICT (user_id, name) DO NOTHING
+    `;
+    existingNames.add(name);
+    nextOrder += 1;
+    extraCount += 1;
+  }
+}
+console.log(`✅ タスクから${extraCount}件のカテゴリを補完しました`);
 
 // 既存JSONデータの移行
 if (existsSync(DATA_FILE)) {

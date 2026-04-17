@@ -1,5 +1,5 @@
 import { createServer } from "http";
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory, seedDefaultCategories } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
 
@@ -68,6 +68,7 @@ const server = createServer(async (req, res) => {
       const passwordHash = await hashPassword(password);
       const termsAgreedAt = new Date().toISOString();
       const user = await createUser(id, email, name, passwordHash, termsAgreedAt);
+      await seedDefaultCategories(user.id);
       const token = await createToken(user.id);
 
       res.writeHead(201, { "Content-Type": "application/json" });

@@ -15,6 +15,7 @@ vi.mock("./db.js", () => ({
   createCategory: vi.fn(),
   updateCategory: vi.fn(),
   deleteCategory: vi.fn(),
+  seedDefaultCategories: vi.fn(),
 }));
 
 vi.mock("./auth.js", () => ({
@@ -24,7 +25,7 @@ vi.mock("./auth.js", () => ({
   verifyToken: vi.fn().mockResolvedValue("user123"),
 }));
 
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory, seedDefaultCategories } from "./db.js";
 import { verifyPassword, verifyToken } from "./auth.js";
 import { handler } from "./handler.js";
 
@@ -186,6 +187,36 @@ describe("POST /api/auth/register", () => {
     expect(body.user.email).toBe("test@example.com");
     expect(body.token).toBe("test-token");
     expect(createUser).toHaveBeenCalled();
+  });
+
+  it("seeds default categories for a newly registered user", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+    vi.mocked(createUser).mockResolvedValue(mockUser);
+
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+      termsAgreed: true,
+    }, false));
+
+    expect(res.statusCode).toBe(201);
+    expect(seedDefaultCategories).toHaveBeenCalledWith(mockUser.id);
+    expect(seedDefaultCategories).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not seed categories when registration fails", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(mockUserRow);
+
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+      termsAgreed: true,
+    }, false));
+
+    expect(res.statusCode).toBe(409);
+    expect(seedDefaultCategories).not.toHaveBeenCalled();
   });
 
   it("returns 400 when fields are missing", async () => {

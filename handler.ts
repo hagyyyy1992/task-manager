@@ -1,4 +1,4 @@
-import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory } from "./db.js";
+import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory, seedDefaultCategories } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
 
@@ -68,6 +68,7 @@ export const handler = async (event: LambdaEvent) => {
       const passwordHash = await hashPassword(password);
       const termsAgreedAt = new Date().toISOString();
       const user = await createUser(id, email, name, passwordHash, termsAgreedAt);
+      await seedDefaultCategories(user.id);
       const token = await createToken(user.id);
 
       return { statusCode: 201, headers, body: JSON.stringify({ user, token }) };
