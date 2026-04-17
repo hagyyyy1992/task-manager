@@ -3,7 +3,26 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import { PasswordInput } from '../components/PasswordInput'
 
+function RegisterDisabled() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
+      <div className="w-full max-w-sm text-center">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Task Manager</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">新規登録は現在受け付けていません</p>
+        <Link to="/login" className="text-blue-600 hover:underline text-sm">ログインへ戻る</Link>
+      </div>
+    </div>
+  )
+}
+
 export function RegisterPage() {
+  if (import.meta.env.VITE_ALLOW_REGISTRATION !== 'true') {
+    return <RegisterDisabled />
+  }
+  return <RegisterForm />
+}
+
+function RegisterForm() {
   const { register } = useAuth()
   const navigate = useNavigate()
   const [name, setName] = useState('')

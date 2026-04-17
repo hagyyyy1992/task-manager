@@ -15,3 +15,9 @@ variable "project_name" {
   type        = string
   default     = "task-app"
 }
+
+variable "allow_registration" {
+  description = "新規ユーザー登録を許可するか（文字列 'true' で有効、デフォルト無効）"
+  type        = string
+  default     = "false"
+}

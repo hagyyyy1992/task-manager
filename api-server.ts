@@ -39,6 +39,12 @@ const server = createServer(async (req, res) => {
 
     // POST /api/auth/register
     if (url === "/api/auth/register" && req.method === "POST") {
+      if (process.env.ALLOW_REGISTRATION !== "true") {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "新規登録は現在受け付けていません" }));
+        return;
+      }
+
       const { email, password, name, termsAgreed } = JSON.parse(await readBody(req));
 
       if (!email || !password || !name) {

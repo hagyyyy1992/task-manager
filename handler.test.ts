@@ -71,6 +71,8 @@ beforeEach(() => {
   // デフォルトのモック挙動をリセット
   vi.mocked(verifyToken).mockResolvedValue("user123");
   vi.mocked(verifyPassword).mockResolvedValue(true);
+  // 登録テストで必要な環境変数を有効化（各describeで上書き可）
+  process.env.ALLOW_REGISTRATION = "true";
 });
 
 // ─── 既存タスクAPIテスト ──────────────────────────────────────────
@@ -270,6 +272,36 @@ describe("POST /api/auth/register", () => {
 
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).error).toContain("already registered");
+  });
+
+  it("returns 403 when ALLOW_REGISTRATION is not 'true'", async () => {
+    process.env.ALLOW_REGISTRATION = "false";
+
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+      termsAgreed: true,
+    }, false));
+
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toContain("受け付けていません");
+    expect(createUser).not.toHaveBeenCalled();
+    expect(seedDefaultCategories).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when ALLOW_REGISTRATION is unset (fail closed)", async () => {
+    delete process.env.ALLOW_REGISTRATION;
+
+    const res = await handler(event("POST", "/api/auth/register", {
+      email: "test@example.com",
+      password: "password1234",
+      name: "Test User",
+      termsAgreed: true,
+    }, false));
+
+    expect(res.statusCode).toBe(403);
+    expect(createUser).not.toHaveBeenCalled();
   });
 });
 

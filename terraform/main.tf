@@ -104,7 +104,8 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      DATABASE_URL = var.database_url
+      DATABASE_URL       = var.database_url
+      ALLOW_REGISTRATION = var.allow_registration
     }
   }
 }

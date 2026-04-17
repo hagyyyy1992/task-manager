@@ -64,10 +64,12 @@ export function LoginPage() {
             {submitting ? 'ログイン中...' : 'ログイン'}
           </button>
 
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            アカウントがない場合は{' '}
-            <Link to="/register" className="text-blue-600 hover:underline">新規登録</Link>
-          </p>
+          {import.meta.env.VITE_ALLOW_REGISTRATION === 'true' && (
+            <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+              アカウントがない場合は{' '}
+              <Link to="/register" className="text-blue-600 hover:underline">新規登録</Link>
+            </p>
+          )}
         </form>
       </div>
     </div>
