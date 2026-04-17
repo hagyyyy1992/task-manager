@@ -29,6 +29,11 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Run database migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx tsx migrate.ts
+
       - name: Build frontend
         run: npm run build
 
