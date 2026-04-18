@@ -1,17 +1,8 @@
 # task-manager
 
 自分用のタスク管理アプリ。<br>
-React フロントエンド + Node.js API サーバー + MCP サーバーの3層構成。<br>
+React フロントエンド + Node.js API サーバーの2層構成。<br>
 Neon PostgreSQL をバックエンドに使用することで複数端末間でタスクを同期できる。
-
-アプリURL: 
-https://d3pi0juuilndgb.cloudfront.net
-
-### デモアカウント
-
-| メール | パスワード |
-|--------|-----------|
-| demo@example.com | password1234 |
 
 ## 構成
 
@@ -23,7 +14,6 @@ task-manager/
 ├── db.ts              # Prisma Client + DB操作関数
 ├── handler.ts         # Lambda ハンドラー
 ├── api-server.ts      # ローカル開発用 API サーバー（port 3456）
-├── mcp-server.ts      # MCP サーバー（Claude Code から操作）
 └── migrate.ts         # マイグレーション + シード
 ```
 
@@ -37,7 +27,6 @@ task-manager/
 | ORM | Prisma + @prisma/adapter-neon |
 | データベース | Neon PostgreSQL |
 | 認証 | JWT (jose) + crypto.scrypt |
-| MCP サーバー | @modelcontextprotocol/sdk |
 | ドラッグ&ドロップ | @dnd-kit |
 | テスト | Vitest + @testing-library/react |
 | インフラ | AWS (S3 + CloudFront + Lambda + API Gateway) |
@@ -97,32 +86,6 @@ npx tsx api-server.ts
 ```
 
 フロントエンドはこの API サーバーを通じて DB と通信する。
-
-## MCP サーバー（Claude Code 連携）
-
-`~/.claude/mcp.json` に以下を追加:
-
-```json
-{
-  "mcpServers": {
-    "task-app": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/task-manager/mcp-server.ts"]
-    }
-  }
-}
-```
-
-Claude Code から `/mcp` で接続状態を確認できる。
-
-### MCP ツール一覧
-
-| ツール | 説明 |
-|--------|------|
-| `list_tasks` | タスク一覧を取得。`status` / `category` でフィルタ可能 |
-| `create_task` | 新しいタスクを作成 |
-| `update_task` | ステータス・優先度・タイトル・メモ・期限を更新 |
-| `delete_task` | タスクを削除 |
 
 ## REST API
 
