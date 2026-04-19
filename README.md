@@ -45,20 +45,21 @@ npm install
 
 ### 2. 環境変数の設定
 
-`.env` ファイルをプロジェクトルートに作成（gitignore 済み）:
-
-```
-DATABASE_URL=postgresql://...（Neon の接続文字列）
-JWT_SECRET=...（32バイト以上の乱数推奨、本番とローカルで別値）
-```
-
-1Password を使っている場合は `.env.tpl` 経由で注入できる:
+`.env.example` をコピーして `.env` を作成（gitignore 済み）:
 
 ```bash
-op run --env-file=.env.tpl -- <command>
+cp .env.example .env
+# 各値を埋める
 ```
 
-JWT_SECRET は未設定だと起動時に例外を投げる（fail-fast）。
+必要な変数:
+
+- `DATABASE_URL` — Neon の接続文字列
+- `JWT_SECRET` — JWT 署名用の乱数（`openssl rand -base64 48` 推奨）
+- `TASK_APP_TOKEN` — MCP サーバーを使う場合のみ
+
+`JWT_SECRET` は未設定だと起動時に例外を投げる（fail-fast）。
+`db.ts` が起動時に `.env` を自動読み込みするため、スクリプト側で `dotenv` 不要。
 
 ### 3. Prisma Client 生成
 
@@ -152,20 +153,18 @@ Claude Code からタスクを直接操作するための MCP サーバー。
 1. 長期JWTを発行（1年有効）:
 
    ```bash
-   op run --env-file=.env.tpl -- npx tsx issue-token.ts <your-email>
+   npx tsx issue-token.ts <your-email>
    ```
 
-2. 出力されたJWTを 1Password に保存（例: `op://Personal/task-app/mcp-token`）
+2. 出力されたJWTを `.env` の `TASK_APP_TOKEN=` にセット
 
-3. Claude Code の MCP 設定に登録:
+3. Claude Code の MCP 設定に登録（絶対パス）:
 
    ```bash
-   claude mcp add task-app --scope user \
-     -- op run --env-file=/absolute/path/to/.env.tpl \
-        -- npx tsx /absolute/path/to/mcp-server.ts
+   claude mcp add task-app --scope user -- npx tsx <project-root>/mcp-server.ts
    ```
 
-   `.env.tpl` に `TASK_APP_TOKEN=op://Personal/task-app/mcp-token` を追加しておくこと。
+   `db.ts` がプロジェクトルートの `.env` を自動読み込みするため、`claude mcp` 側で環境変数を個別に渡す必要はない。
 
 4. 動作確認:
 
