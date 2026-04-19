@@ -76,7 +76,7 @@ export async function loadTasks(filters?: {
   return rows.map(dbTaskToTask);
 }
 
-export async function createTask(task: Task, userId?: string): Promise<void> {
+export async function createTask(task: Task, userId: string): Promise<void> {
   await prisma.task.create({
     data: {
       id: task.id,
@@ -86,7 +86,7 @@ export async function createTask(task: Task, userId?: string): Promise<void> {
       category: task.category,
       dueDate: task.dueDate ? new Date(task.dueDate + "T00:00:00Z") : null,
       memo: task.memo,
-      userId: userId ?? null,
+      userId,
       createdAt: new Date(task.createdAt),
       updatedAt: new Date(task.updatedAt),
     },
@@ -95,9 +95,10 @@ export async function createTask(task: Task, userId?: string): Promise<void> {
 
 export async function updateTask(
   id: string,
-  updates: Partial<Pick<Task, "status" | "priority" | "title" | "memo" | "dueDate">>
+  updates: Partial<Pick<Task, "status" | "priority" | "title" | "memo" | "dueDate">>,
+  userId: string
 ): Promise<Task | null> {
-  const existing = await prisma.task.findUnique({ where: { id } });
+  const existing = await prisma.task.findFirst({ where: { id, userId } });
   if (!existing) return null;
 
   const now = new Date();
@@ -114,8 +115,8 @@ export async function updateTask(
   return dbTaskToTask(updated);
 }
 
-export async function deleteTask(id: string): Promise<Task | null> {
-  const existing = await prisma.task.findUnique({ where: { id } });
+export async function deleteTask(id: string, userId: string): Promise<Task | null> {
+  const existing = await prisma.task.findFirst({ where: { id, userId } });
   if (!existing) return null;
 
   await prisma.task.delete({ where: { id } });
@@ -267,8 +268,12 @@ export async function createCategory(userId: string, name: string, sortOrder?: n
   return dbCategoryToCategory(row);
 }
 
-export async function updateCategory(id: string, updates: { name?: string; sortOrder?: number }): Promise<Category | null> {
-  const existing = await prisma.category.findUnique({ where: { id } });
+export async function updateCategory(
+  id: string,
+  updates: { name?: string; sortOrder?: number },
+  userId: string
+): Promise<Category | null> {
+  const existing = await prisma.category.findFirst({ where: { id, userId } });
   if (!existing) return null;
 
   const data: Record<string, unknown> = {};
@@ -279,8 +284,8 @@ export async function updateCategory(id: string, updates: { name?: string; sortO
   return dbCategoryToCategory(updated);
 }
 
-export async function deleteCategory(id: string): Promise<boolean> {
-  const existing = await prisma.category.findUnique({ where: { id } });
+export async function deleteCategory(id: string, userId: string): Promise<boolean> {
+  const existing = await prisma.category.findFirst({ where: { id, userId } });
   if (!existing) return false;
   await prisma.category.delete({ where: { id } });
   return true;

@@ -10,6 +10,12 @@ variable "database_url" {
   sensitive   = true
 }
 
+variable "jwt_secret" {
+  description = "JWT署名用のシークレット（32バイト以上の乱数推奨）"
+  type        = string
+  sensitive   = true
+}
+
 variable "project_name" {
   description = "Project name prefix for all resources"
   type        = string

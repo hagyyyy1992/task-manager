@@ -1,9 +1,11 @@
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "task-app-dev-secret-change-in-production"
-);
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET is required");
+}
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
@@ -30,6 +32,15 @@ export async function createToken(userId: string): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
+    .sign(JWT_SECRET);
+}
+
+// MCP等の長期利用クライアント向け（1年）。UI経由の通常ログインでは使わない
+export async function createLongLivedToken(userId: string): Promise<string> {
+  return new SignJWT({ sub: userId, scope: "mcp" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("365d")
     .sign(JWT_SECRET);
 }
 

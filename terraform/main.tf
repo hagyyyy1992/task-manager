@@ -106,6 +106,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       DATABASE_URL       = var.database_url
       ALLOW_REGISTRATION = var.allow_registration
+      JWT_SECRET         = var.jwt_secret
     }
   }
 }
