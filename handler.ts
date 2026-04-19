@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory, seedDefaultCategories } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
@@ -25,7 +26,7 @@ function parseBody(event: LambdaEvent): unknown {
 }
 
 function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  return randomUUID();
 }
 
 function getToken(event: LambdaEvent): string | null {
@@ -182,7 +183,7 @@ export const handler = async (event: LambdaEvent) => {
     if (categoryPatchMatch && method === "PATCH") {
       const id = categoryPatchMatch[1];
       const updates = parseBody(event) as { name?: string; sortOrder?: number };
-      const updated = await updateCategory(id, updates);
+      const updated = await updateCategory(id, updates, userId);
       if (!updated) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: "not found" }) };
       }
@@ -193,7 +194,7 @@ export const handler = async (event: LambdaEvent) => {
     const categoryDeleteMatch = path.match(/^\/api\/categories\/(.+)$/);
     if (categoryDeleteMatch && method === "DELETE") {
       const id = categoryDeleteMatch[1];
-      const deleted = await deleteCategory(id);
+      const deleted = await deleteCategory(id, userId);
       if (!deleted) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: "not found" }) };
       }
@@ -220,7 +221,7 @@ export const handler = async (event: LambdaEvent) => {
     if (patchMatch && method === "PATCH") {
       const id = patchMatch[1];
       const updates = parseBody(event) as Partial<Pick<Task, "status" | "priority" | "title" | "memo" | "dueDate">>;
-      const updated = await updateTask(id, updates);
+      const updated = await updateTask(id, updates, userId);
       if (!updated) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: "not found" }) };
       }
@@ -231,7 +232,7 @@ export const handler = async (event: LambdaEvent) => {
     const deleteMatch = path.match(/^\/api\/tasks\/(.+)$/);
     if (deleteMatch && method === "DELETE") {
       const id = deleteMatch[1];
-      const deleted = await deleteTask(id);
+      const deleted = await deleteTask(id, userId);
       if (!deleted) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: "not found" }) };
       }

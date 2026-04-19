@@ -14,7 +14,9 @@ task-manager/
 ├── db.ts              # Prisma Client + DB操作関数
 ├── handler.ts         # Lambda ハンドラー
 ├── api-server.ts      # ローカル開発用 API サーバー（port 3456）
-└── migrate.ts         # マイグレーション + シード
+├── migrate.ts         # マイグレーション + シード
+├── mcp-server.ts      # Claude Code 連携用 MCP サーバー（認証必須）
+└── issue-token.ts     # MCP用 長期JWT 発行 CLI
 ```
 
 ## 技術スタック
@@ -43,17 +45,21 @@ npm install
 
 ### 2. 環境変数の設定
 
-`.env` ファイルをプロジェクトルートに作成（gitignore 済み）:
-
-```
-DATABASE_URL=postgresql://...（Neon の接続文字列）
-```
-
-1Password を使っている場合は以下で取得できる:
+`.env.example` をコピーして `.env` を作成（gitignore 済み）:
 
 ```bash
-op run --env-file=.env.tpl -- env | grep DATABASE_URL
+cp .env.example .env
+# 各値を埋める
 ```
+
+必要な変数:
+
+- `DATABASE_URL` — Neon の接続文字列
+- `JWT_SECRET` — JWT 署名用の乱数（`openssl rand -base64 48` 推奨）
+- `TASK_APP_TOKEN` — MCP サーバーを使う場合のみ
+
+`JWT_SECRET` は未設定だと起動時に例外を投げる（fail-fast）。
+`db.ts` が起動時に `.env` を自動読み込みするため、スクリプト側で `dotenv` 不要。
 
 ### 3. Prisma Client 生成
 
@@ -126,3 +132,48 @@ User ─┬── Task (1:N)
 | users | ユーザー（メール・パスワード・利用規約同意日時） |
 | tasks | タスク（ユーザー別、カテゴリはテキスト） |
 | categories | カテゴリ（ユーザー別、並び順付き） |
+
+## MCP サーバー
+
+Claude Code からタスクを直接操作するための MCP サーバー。
+**長期JWTによる認証必須**（旧実装の IDOR 脆弱性は恒久対応済み）。
+
+### 提供ツール
+
+| ツール | 説明 |
+|--------|------|
+| `list_tasks` | ステータス／カテゴリでフィルタした一覧 |
+| `list_categories` | 自分のカテゴリ一覧 |
+| `create_task` | 新規タスク作成 |
+| `update_task` | ステータス・優先度・メモ等の更新 |
+| `delete_task` | タスク削除 |
+
+### セットアップ
+
+1. 長期JWTを発行（1年有効）:
+
+   ```bash
+   npx tsx issue-token.ts <your-email>
+   ```
+
+2. 出力されたJWTを `.env` の `TASK_APP_TOKEN=` にセット
+
+3. Claude Code の MCP 設定に登録（絶対パス）:
+
+   ```bash
+   claude mcp add task-app --scope user -- npx tsx <project-root>/mcp-server.ts
+   ```
+
+   `db.ts` がプロジェクトルートの `.env` を自動読み込みするため、`claude mcp` 側で環境変数を個別に渡す必要はない。
+
+4. 動作確認:
+
+   ```
+   claude mcp list
+   # task-app: ... - ✓ Connected
+   ```
+
+### トークン失効
+
+- JWT_SECRET をローテートすれば既存トークンを一括無効化できる
+- 個別失効機構はなし（必要なら `token_revocations` テーブル等の追加検討）

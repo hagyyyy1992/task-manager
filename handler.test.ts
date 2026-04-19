@@ -103,7 +103,7 @@ describe("task endpoints", () => {
     vi.mocked(updateTask).mockResolvedValue(updated);
     const res = await handler(event("PATCH", "/api/tasks/test123", { status: "done" }));
     expect(res.statusCode).toBe(200);
-    expect(updateTask).toHaveBeenCalledWith("test123", { status: "done" });
+    expect(updateTask).toHaveBeenCalledWith("test123", { status: "done" }, "user123");
     expect(JSON.parse(res.body).status).toBe("done");
   });
 
@@ -117,7 +117,21 @@ describe("task endpoints", () => {
     vi.mocked(deleteTask).mockResolvedValue(mockTask);
     const res = await handler(event("DELETE", "/api/tasks/test123"));
     expect(res.statusCode).toBe(200);
-    expect(deleteTask).toHaveBeenCalledWith("test123");
+    expect(deleteTask).toHaveBeenCalledWith("test123", "user123");
+  });
+
+  it("PATCH /api/tasks/:id 他ユーザーのタスクは404（IDOR対策）", async () => {
+    vi.mocked(updateTask).mockResolvedValue(null);
+    const res = await handler(event("PATCH", "/api/tasks/someone-else-task", { status: "done" }));
+    expect(res.statusCode).toBe(404);
+    expect(updateTask).toHaveBeenCalledWith("someone-else-task", { status: "done" }, "user123");
+  });
+
+  it("DELETE /api/tasks/:id 他ユーザーのタスクは404（IDOR対策）", async () => {
+    vi.mocked(deleteTask).mockResolvedValue(null);
+    const res = await handler(event("DELETE", "/api/tasks/someone-else-task"));
+    expect(res.statusCode).toBe(404);
+    expect(deleteTask).toHaveBeenCalledWith("someone-else-task", "user123");
   });
 
   it("DELETE /api/tasks/:id returns 404 for unknown id", async () => {
@@ -496,7 +510,7 @@ describe("PATCH /api/categories/:id", () => {
     vi.mocked(updateCategory).mockResolvedValue(updated);
     const res = await handler(event("PATCH", "/api/categories/cat123", { name: "更新済み" }));
     expect(res.statusCode).toBe(200);
-    expect(updateCategory).toHaveBeenCalledWith("cat123", { name: "更新済み" });
+    expect(updateCategory).toHaveBeenCalledWith("cat123", { name: "更新済み" }, "user123");
     expect(JSON.parse(res.body).name).toBe("更新済み");
   });
 
@@ -510,6 +524,13 @@ describe("PATCH /api/categories/:id", () => {
     const res = await handler(event("PATCH", "/api/categories/cat123", { name: "test" }, false));
     expect(res.statusCode).toBe(401);
   });
+
+  it("他ユーザーのカテゴリは404（IDOR対策）", async () => {
+    vi.mocked(updateCategory).mockResolvedValue(null);
+    const res = await handler(event("PATCH", "/api/categories/someone-else-cat", { name: "steal" }));
+    expect(res.statusCode).toBe(404);
+    expect(updateCategory).toHaveBeenCalledWith("someone-else-cat", { name: "steal" }, "user123");
+  });
 });
 
 describe("DELETE /api/categories/:id", () => {
@@ -517,7 +538,14 @@ describe("DELETE /api/categories/:id", () => {
     vi.mocked(deleteCategory).mockResolvedValue(true);
     const res = await handler(event("DELETE", "/api/categories/cat123"));
     expect(res.statusCode).toBe(200);
-    expect(deleteCategory).toHaveBeenCalledWith("cat123");
+    expect(deleteCategory).toHaveBeenCalledWith("cat123", "user123");
+  });
+
+  it("他ユーザーのカテゴリは404（IDOR対策）", async () => {
+    vi.mocked(deleteCategory).mockResolvedValue(false);
+    const res = await handler(event("DELETE", "/api/categories/someone-else-cat"));
+    expect(res.statusCode).toBe(404);
+    expect(deleteCategory).toHaveBeenCalledWith("someone-else-cat", "user123");
   });
 
   it("returns 404 for unknown id", async () => {

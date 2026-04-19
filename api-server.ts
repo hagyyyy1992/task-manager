@@ -1,4 +1,5 @@
 import { createServer } from "http";
+import { randomUUID } from "crypto";
 import { loadTasks, createTask, updateTask, deleteTask, findUserByEmail, findUserById, createUser, updateUserPassword, deleteUser, loadCategories, createCategory, updateCategory, deleteCategory, seedDefaultCategories } from "./db.js";
 import type { Task } from "./db.js";
 import { hashPassword, verifyPassword, createToken, verifyToken } from "./auth.js";
@@ -12,7 +13,7 @@ function readBody(req: import("http").IncomingMessage): Promise<string> {
 }
 
 function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  return randomUUID();
 }
 
 function getToken(req: import("http").IncomingMessage): string | null {
@@ -222,7 +223,7 @@ const server = createServer(async (req, res) => {
     if (categoryPatchMatch && req.method === "PATCH") {
       const body = await readBody(req);
       const updates = JSON.parse(body);
-      const updated = await updateCategory(categoryPatchMatch[1], updates);
+      const updated = await updateCategory(categoryPatchMatch[1], updates, userId);
       if (!updated) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "not found" }));
@@ -236,7 +237,7 @@ const server = createServer(async (req, res) => {
     // DELETE /api/categories/:id
     const categoryDeleteMatch = url.match(/^\/api\/categories\/(.+)$/);
     if (categoryDeleteMatch && req.method === "DELETE") {
-      const deleted = await deleteCategory(categoryDeleteMatch[1]);
+      const deleted = await deleteCategory(categoryDeleteMatch[1], userId);
       if (!deleted) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "not found" }));
@@ -272,7 +273,7 @@ const server = createServer(async (req, res) => {
     if (patchMatch && req.method === "PATCH") {
       const body = await readBody(req);
       const updates = JSON.parse(body);
-      const updated = await updateTask(patchMatch[1], updates);
+      const updated = await updateTask(patchMatch[1], updates, userId);
       if (!updated) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "not found" }));
@@ -286,7 +287,7 @@ const server = createServer(async (req, res) => {
     // DELETE /api/tasks/:id
     const deleteMatch = url.match(/^\/api\/tasks\/(.+)$/);
     if (deleteMatch && req.method === "DELETE") {
-      const deleted = await deleteTask(deleteMatch[1]);
+      const deleted = await deleteTask(deleteMatch[1], userId);
       if (!deleted) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "not found" }));
