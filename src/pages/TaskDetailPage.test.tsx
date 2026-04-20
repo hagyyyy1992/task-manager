@@ -7,17 +7,15 @@ vi.mock('../store', () => ({
   loadTask: vi.fn(),
   apiUpdateTask: vi.fn(),
   apiDeleteTask: vi.fn(),
-  loadCategories: vi
-    .fn()
-    .mockResolvedValue([
-      {
-        id: 'cat1',
-        userId: 'u1',
-        name: 'その他',
-        sortOrder: 0,
-        createdAt: '2026-01-01T00:00:00.000Z',
-      },
-    ]),
+  loadCategories: vi.fn().mockResolvedValue([
+    {
+      id: 'cat1',
+      userId: 'u1',
+      name: 'その他',
+      sortOrder: 0,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+  ]),
 }))
 
 vi.mock('../auth', () => ({

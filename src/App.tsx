@@ -4,18 +4,9 @@ import { loadTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, loadCategories 
 import { TaskForm } from './components/TaskForm'
 import { TaskItem } from './components/TaskItem'
 import { AppHeader } from './components/AppHeader'
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import './index.css'
 
 type FilterStatus = TaskStatus | 'all'
@@ -30,19 +21,23 @@ function App() {
   const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [searchText, setSearchText] = useState('')
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   useEffect(() => {
     let cancelled = false
-    loadTasks().then((data) => {
-      if (!cancelled) setTasks(data)
-    }).catch(console.error)
-    loadCategories().then((data) => {
-      if (!cancelled) setCategories(data)
-    }).catch(console.error)
-    return () => { cancelled = true }
+    loadTasks()
+      .then((data) => {
+        if (!cancelled) setTasks(data)
+      })
+      .catch(console.error)
+    loadCategories()
+      .then((data) => {
+        if (!cancelled) setCategories(data)
+      })
+      .catch(console.error)
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const addTask = useCallback(async (task: Task) => {
@@ -55,25 +50,24 @@ function App() {
     }
   }, [])
 
-  const deleteTask = useCallback(async (id: string) => {
-    if (!confirm('削除しますか？')) return
-    const prev = tasks
-    setTasks((t) => t.filter((task) => task.id !== id))
-    try {
-      await apiDeleteTask(id)
-    } catch (e) {
-      console.error(e)
-      setTasks(prev)
-    }
-  }, [tasks])
+  const deleteTask = useCallback(
+    async (id: string) => {
+      if (!confirm('削除しますか？')) return
+      const prev = tasks
+      setTasks((t) => t.filter((task) => task.id !== id))
+      try {
+        await apiDeleteTask(id)
+      } catch (e) {
+        console.error(e)
+        setTasks(prev)
+      }
+    },
+    [tasks],
+  )
 
   const changeStatus = useCallback(async (id: string, status: TaskStatus) => {
     const now = new Date().toISOString()
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, status, updatedAt: now } : t
-      )
-    )
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status, updatedAt: now } : t)))
     try {
       await apiUpdateTask(id, { status })
     } catch (e) {
@@ -223,7 +217,9 @@ function App() {
           >
             <option value="all">全カテゴリ</option>
             {categories.map((c) => (
-              <option key={c.id} value={c.name}>{c.name}</option>
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
             ))}
           </select>
 
@@ -241,11 +237,7 @@ function App() {
         </div>
 
         {/* Task List */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext
             items={displayTasks.map((t) => t.id)}
             strategy={verticalListSortingStrategy}
@@ -253,7 +245,9 @@ function App() {
             <div className="space-y-2">
               {displayTasks.length === 0 ? (
                 <p className="text-center text-gray-400 dark:text-gray-500 py-12">
-                  {tasks.length === 0 ? 'タスクがありません' : 'フィルタに一致するタスクがありません'}
+                  {tasks.length === 0
+                    ? 'タスクがありません'
+                    : 'フィルタに一致するタスクがありません'}
                 </p>
               ) : (
                 displayTasks.map((task) => (

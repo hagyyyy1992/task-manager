@@ -26,7 +26,7 @@ export async function apiCreateTask(task: Task): Promise<void> {
 
 export async function apiUpdateTask(
   id: string,
-  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate'>>
+  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate'>>,
 ): Promise<Task> {
   const res = await fetch(`${API}/${id}`, {
     method: 'PATCH',
@@ -65,7 +65,7 @@ export async function apiCreateCategory(name: string, sortOrder?: number): Promi
 
 export async function apiUpdateCategory(
   id: string,
-  updates: { name?: string; sortOrder?: number }
+  updates: { name?: string; sortOrder?: number },
 ): Promise<Category> {
   const res = await fetch(`${CATEGORIES_API}/${id}`, {
     method: 'PATCH',

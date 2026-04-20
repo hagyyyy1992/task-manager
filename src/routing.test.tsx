@@ -18,9 +18,16 @@ describe('routing', () => {
       <MemoryRouter initialEntries={['/']}>
         <Routes>
           <Route path="/login" element={<div data-testid="login">ログイン</div>} />
-          <Route path="/" element={<ProtectedRoute isAuth={false}><div data-testid="list">タスク一覧</div></ProtectedRoute>} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute isAuth={false}>
+                <div data-testid="list">タスク一覧</div>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     )
     expect(screen.getByTestId('login')).toBeInTheDocument()
     unmount()
@@ -31,9 +38,16 @@ describe('routing', () => {
       <MemoryRouter initialEntries={['/']}>
         <Routes>
           <Route path="/login" element={<div data-testid="login">ログイン</div>} />
-          <Route path="/" element={<ProtectedRoute isAuth={true}><div data-testid="list">タスク一覧</div></ProtectedRoute>} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute isAuth={true}>
+                <div data-testid="list">タスク一覧</div>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     )
     expect(screen.getByTestId('list')).toBeInTheDocument()
     unmount()
@@ -43,10 +57,17 @@ describe('routing', () => {
     const { unmount } = render(
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
-          <Route path="/login" element={<PublicRoute isAuth={true}><div>ログインフォーム</div></PublicRoute>} />
+          <Route
+            path="/login"
+            element={
+              <PublicRoute isAuth={true}>
+                <div>ログインフォーム</div>
+              </PublicRoute>
+            }
+          />
           <Route path="/" element={<div data-testid="list">タスク一覧</div>} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     )
     expect(screen.getByTestId('list')).toBeInTheDocument()
     unmount()
@@ -56,10 +77,17 @@ describe('routing', () => {
     const { unmount } = render(
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
-          <Route path="/login" element={<PublicRoute isAuth={false}><div data-testid="login">ログインフォーム</div></PublicRoute>} />
+          <Route
+            path="/login"
+            element={
+              <PublicRoute isAuth={false}>
+                <div data-testid="login">ログインフォーム</div>
+              </PublicRoute>
+            }
+          />
           <Route path="/" element={<div>タスク一覧</div>} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     )
     expect(screen.getByTestId('login')).toBeInTheDocument()
     unmount()
@@ -70,9 +98,16 @@ describe('routing', () => {
       <MemoryRouter initialEntries={['/task/abc']}>
         <Routes>
           <Route path="/login" element={<div data-testid="login">ログイン</div>} />
-          <Route path="/task/:id" element={<ProtectedRoute isAuth={false}><div>タスク詳細</div></ProtectedRoute>} />
+          <Route
+            path="/task/:id"
+            element={
+              <ProtectedRoute isAuth={false}>
+                <div>タスク詳細</div>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     )
     expect(screen.getByTestId('login')).toBeInTheDocument()
     unmount()
@@ -83,9 +118,16 @@ describe('routing', () => {
       <MemoryRouter initialEntries={['/account']}>
         <Routes>
           <Route path="/login" element={<div data-testid="login">ログイン</div>} />
-          <Route path="/account" element={<ProtectedRoute isAuth={false}><div>アカウント</div></ProtectedRoute>} />
+          <Route
+            path="/account"
+            element={
+              <ProtectedRoute isAuth={false}>
+                <div>アカウント</div>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     )
     expect(screen.getByTestId('login')).toBeInTheDocument()
     unmount()

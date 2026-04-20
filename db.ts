@@ -1,79 +1,79 @@
-import { PrismaClient } from "./src/generated/prisma/client.js";
-import { PrismaNeon } from "@prisma/adapter-neon";
-import { readFileSync, existsSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import { PrismaClient } from './src/generated/prisma/client.js'
+import { PrismaNeon } from '@prisma/adapter-neon'
+import { readFileSync, existsSync } from 'fs'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const envFile = join(__dirname, ".env");
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const envFile = join(__dirname, '.env')
 if (existsSync(envFile)) {
-  for (const line of readFileSync(envFile, "utf-8").split("\n")) {
-    const idx = line.indexOf("=");
-    if (idx > 0 && !line.startsWith("#")) {
-      const key = line.slice(0, idx).trim();
-      const val = line.slice(idx + 1).trim();
-      if (!process.env[key]) process.env[key] = val;
+  for (const line of readFileSync(envFile, 'utf-8').split('\n')) {
+    const idx = line.indexOf('=')
+    if (idx > 0 && !line.startsWith('#')) {
+      const key = line.slice(0, idx).trim()
+      const val = line.slice(idx + 1).trim()
+      if (!process.env[key]) process.env[key] = val
     }
   }
 }
 
 const adapter = new PrismaNeon({
   connectionString: process.env.DATABASE_URL!,
-});
-export const prisma = new PrismaClient({ adapter });
+})
+export const prisma = new PrismaClient({ adapter })
 
 export interface Task {
-  id: string;
-  title: string;
-  status: "todo" | "in_progress" | "done";
-  priority: "high" | "medium" | "low";
-  category: string;
-  dueDate: string | null;
-  memo: string;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  title: string
+  status: 'todo' | 'in_progress' | 'done'
+  priority: 'high' | 'medium' | 'low'
+  category: string
+  dueDate: string | null
+  memo: string
+  createdAt: string
+  updatedAt: string
 }
 
 function dbTaskToTask(row: {
-  id: string;
-  title: string;
-  status: string;
-  priority: string;
-  category: string;
-  dueDate: Date | null;
-  memo: string;
-  createdAt: Date;
-  updatedAt: Date;
+  id: string
+  title: string
+  status: string
+  priority: string
+  category: string
+  dueDate: Date | null
+  memo: string
+  createdAt: Date
+  updatedAt: Date
 }): Task {
   return {
     id: row.id,
     title: row.title,
-    status: row.status as Task["status"],
-    priority: row.priority as Task["priority"],
+    status: row.status as Task['status'],
+    priority: row.priority as Task['priority'],
     category: row.category,
     dueDate: row.dueDate ? row.dueDate.toISOString().slice(0, 10) : null,
     memo: row.memo,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-  };
+  }
 }
 
 export async function loadTasks(filters?: {
-  status?: string;
-  category?: string;
-  userId?: string;
+  status?: string
+  category?: string
+  userId?: string
 }): Promise<Task[]> {
-  const where: Record<string, unknown> = {};
-  if (filters?.userId) where.userId = filters.userId;
-  if (filters?.status) where.status = filters.status;
-  if (filters?.category) where.category = filters.category;
+  const where: Record<string, unknown> = {}
+  if (filters?.userId) where.userId = filters.userId
+  if (filters?.status) where.status = filters.status
+  if (filters?.category) where.category = filters.category
 
   const rows = await prisma.task.findMany({
     where,
-    orderBy: { createdAt: "desc" },
-  });
+    orderBy: { createdAt: 'desc' },
+  })
 
-  return rows.map(dbTaskToTask);
+  return rows.map(dbTaskToTask)
 }
 
 export async function createTask(task: Task, userId: string): Promise<void> {
@@ -84,67 +84,67 @@ export async function createTask(task: Task, userId: string): Promise<void> {
       status: task.status,
       priority: task.priority,
       category: task.category,
-      dueDate: task.dueDate ? new Date(task.dueDate + "T00:00:00Z") : null,
+      dueDate: task.dueDate ? new Date(task.dueDate + 'T00:00:00Z') : null,
       memo: task.memo,
       userId,
       createdAt: new Date(task.createdAt),
       updatedAt: new Date(task.updatedAt),
     },
-  });
+  })
 }
 
 export async function updateTask(
   id: string,
-  updates: Partial<Pick<Task, "status" | "priority" | "title" | "memo" | "dueDate">>,
-  userId: string
+  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate'>>,
+  userId: string,
 ): Promise<Task | null> {
-  const existing = await prisma.task.findFirst({ where: { id, userId } });
-  if (!existing) return null;
+  const existing = await prisma.task.findFirst({ where: { id, userId } })
+  if (!existing) return null
 
-  const now = new Date();
-  const data: Record<string, unknown> = { updatedAt: now };
-  if (updates.title !== undefined) data.title = updates.title;
-  if (updates.status !== undefined) data.status = updates.status;
-  if (updates.priority !== undefined) data.priority = updates.priority;
-  if (updates.memo !== undefined) data.memo = updates.memo;
+  const now = new Date()
+  const data: Record<string, unknown> = { updatedAt: now }
+  if (updates.title !== undefined) data.title = updates.title
+  if (updates.status !== undefined) data.status = updates.status
+  if (updates.priority !== undefined) data.priority = updates.priority
+  if (updates.memo !== undefined) data.memo = updates.memo
   if (updates.dueDate !== undefined) {
-    data.dueDate = updates.dueDate ? new Date(updates.dueDate + "T00:00:00Z") : null;
+    data.dueDate = updates.dueDate ? new Date(updates.dueDate + 'T00:00:00Z') : null
   }
 
-  const updated = await prisma.task.update({ where: { id }, data });
-  return dbTaskToTask(updated);
+  const updated = await prisma.task.update({ where: { id }, data })
+  return dbTaskToTask(updated)
 }
 
 export async function deleteTask(id: string, userId: string): Promise<Task | null> {
-  const existing = await prisma.task.findFirst({ where: { id, userId } });
-  if (!existing) return null;
+  const existing = await prisma.task.findFirst({ where: { id, userId } })
+  if (!existing) return null
 
-  await prisma.task.delete({ where: { id } });
-  return dbTaskToTask(existing);
+  await prisma.task.delete({ where: { id } })
+  return dbTaskToTask(existing)
 }
 
 // ─── Users ──────────────────────────────────────────────────────────────────
 
 export interface User {
-  id: string;
-  email: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  email: string
+  name: string
+  createdAt: string
+  updatedAt: string
 }
 
 interface UserDbRow {
-  id: string;
-  email: string;
-  name: string;
-  password_hash: string;
-  created_at: string;
-  updated_at: string;
+  id: string
+  email: string
+  name: string
+  password_hash: string
+  created_at: string
+  updated_at: string
 }
 
 export async function findUserByEmail(email: string): Promise<UserDbRow | null> {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (!user) return null
   return {
     id: user.id,
     email: user.email,
@@ -152,23 +152,29 @@ export async function findUserByEmail(email: string): Promise<UserDbRow | null> 
     password_hash: user.passwordHash,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString(),
-  };
+  }
 }
 
 export async function findUserById(id: string): Promise<User | null> {
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) return null;
+  const user = await prisma.user.findUnique({ where: { id } })
+  if (!user) return null
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
-  };
+  }
 }
 
-export async function createUser(id: string, email: string, name: string, passwordHash: string, termsAgreedAt?: string): Promise<User> {
-  const now = new Date();
+export async function createUser(
+  id: string,
+  email: string,
+  name: string,
+  passwordHash: string,
+  termsAgreedAt?: string,
+): Promise<User> {
+  const now = new Date()
   const user = await prisma.user.create({
     data: {
       id,
@@ -179,51 +185,51 @@ export async function createUser(id: string, email: string, name: string, passwo
       createdAt: now,
       updatedAt: now,
     },
-  });
+  })
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
-  };
+  }
 }
 
 export async function updateUserPassword(id: string, passwordHash: string): Promise<boolean> {
-  const existing = await prisma.user.findUnique({ where: { id } });
-  if (!existing) return false;
-  const now = new Date();
+  const existing = await prisma.user.findUnique({ where: { id } })
+  if (!existing) return false
+  const now = new Date()
   await prisma.user.update({
     where: { id },
     data: { passwordHash, updatedAt: now },
-  });
-  return true;
+  })
+  return true
 }
 
 export async function deleteUser(id: string): Promise<boolean> {
-  const existing = await prisma.user.findUnique({ where: { id } });
-  if (!existing) return false;
+  const existing = await prisma.user.findUnique({ where: { id } })
+  if (!existing) return false
   // Cascade will delete tasks and categories automatically
-  await prisma.user.delete({ where: { id } });
-  return true;
+  await prisma.user.delete({ where: { id } })
+  return true
 }
 
 // ─── Categories ─────────────────────────────────────────────────────────────
 
 export interface Category {
-  id: string;
-  userId: string;
-  name: string;
-  sortOrder: number;
-  createdAt: string;
+  id: string
+  userId: string
+  name: string
+  sortOrder: number
+  createdAt: string
 }
 
 function dbCategoryToCategory(row: {
-  id: string;
-  userId: string;
-  name: string;
-  sortOrder: number;
-  createdAt: Date;
+  id: string
+  userId: string
+  name: string
+  sortOrder: number
+  createdAt: Date
 }): Category {
   return {
     id: row.id,
@@ -231,16 +237,16 @@ function dbCategoryToCategory(row: {
     name: row.name,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
-  };
+  }
 }
 
 export const DEFAULT_CATEGORIES: ReadonlyArray<{ name: string; sortOrder: number }> = [
-  { name: "決算・税務", sortOrder: 0 },
-  { name: "案件・営業", sortOrder: 1 },
-  { name: "プロダクト開発", sortOrder: 2 },
-  { name: "事務・手続き", sortOrder: 3 },
-  { name: "その他", sortOrder: 4 },
-];
+  { name: '決算・税務', sortOrder: 0 },
+  { name: '案件・営業', sortOrder: 1 },
+  { name: 'プロダクト開発', sortOrder: 2 },
+  { name: '事務・手続き', sortOrder: 3 },
+  { name: 'その他', sortOrder: 4 },
+]
 
 export async function seedDefaultCategories(userId: string): Promise<void> {
   for (const cat of DEFAULT_CATEGORIES) {
@@ -248,45 +254,49 @@ export async function seedDefaultCategories(userId: string): Promise<void> {
       where: { userId_name: { userId, name: cat.name } },
       create: { userId, name: cat.name, sortOrder: cat.sortOrder },
       update: {},
-    });
+    })
   }
 }
 
 export async function loadCategories(userId: string): Promise<Category[]> {
   const rows = await prisma.category.findMany({
     where: { userId },
-    orderBy: { sortOrder: "asc" },
-  });
-  return rows.map(dbCategoryToCategory);
+    orderBy: { sortOrder: 'asc' },
+  })
+  return rows.map(dbCategoryToCategory)
 }
 
-export async function createCategory(userId: string, name: string, sortOrder?: number): Promise<Category> {
-  const order = sortOrder ?? 0;
+export async function createCategory(
+  userId: string,
+  name: string,
+  sortOrder?: number,
+): Promise<Category> {
+  const order = sortOrder ?? 0
   const row = await prisma.category.create({
     data: { userId, name, sortOrder: order },
-  });
-  return dbCategoryToCategory(row);
+  })
+  return dbCategoryToCategory(row)
 }
 
 export async function updateCategory(
   id: string,
   updates: { name?: string; sortOrder?: number },
-  userId: string
+  userId: string,
 ): Promise<Category | null> {
-  const existing = await prisma.category.findFirst({ where: { id, userId } });
-  if (!existing) return null;
+  const existing = await prisma.category.findFirst({ where: { id, userId } })
+  if (!existing) return null
 
-  const data: Record<string, unknown> = {};
-  if (updates.name !== undefined) data.name = updates.name;
-  if (updates.sortOrder !== undefined) data.sortOrder = updates.sortOrder;
+  const data: Record<string, unknown> = {}
+  if (updates.name !== undefined) data.name = updates.name
+  if (updates.sortOrder !== undefined) data.sortOrder = updates.sortOrder
 
-  const updated = await prisma.category.update({ where: { id }, data });
-  return dbCategoryToCategory(updated);
+  const updated = await prisma.category.update({ where: { id }, data })
+  return dbCategoryToCategory(updated)
 }
 
 export async function deleteCategory(id: string, userId: string): Promise<boolean> {
-  const existing = await prisma.category.findFirst({ where: { id, userId } });
-  if (!existing) return false;
-  await prisma.category.delete({ where: { id } });
-  return true;
+  const existing = await prisma.category.findFirst({ where: { id, userId } })
+  if (!existing) return false
+  await prisma.category.delete({ where: { id } })
+  return true
 }

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* ブラウザ・拡張機能オートフィル時のダークモード背景色修正 */
 @media (prefers-color-scheme: dark) {
@@ -15,7 +15,7 @@
 
 /* 1Password等の拡張機能がinlineスタイルで白背景を設定する対策 */
 @media (prefers-color-scheme: dark) {
-  input[style*="background-color"] {
+  input[style*='background-color'] {
     background-color: #374151 !important;
     color: #f3f4f6 !important;
   }
