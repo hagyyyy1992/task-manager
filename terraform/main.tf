@@ -176,6 +176,39 @@ resource "aws_cloudfront_function" "spa_routing" {
   EOF
 }
 
+# ─── CloudFront Response Headers Policy (セキュリティヘッダ) ─────────────────
+
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name    = "${var.project_name}-security-headers"
+  comment = "HSTS / X-Content-Type-Options / X-Frame-Options / Referrer-Policy を全レスポンスに付与"
+
+  security_headers_config {
+    strict_transport_security {
+      access_control_max_age_sec = 31536000 # 1 year
+      include_subdomains         = true
+      preload                    = false # preload list 登録を避けるため false
+      override                   = true
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+  }
+
+  # CSP は controlled rollout（Report-Only で挙動検証 → 本番適用）が必要なため、
+  # このPRではスコープ外。別Issue で対応する。
+}
+
 # ─── CloudFront Distribution ─────────────────────────────────────────────────
 
 locals {
@@ -208,11 +241,12 @@ resource "aws_cloudfront_distribution" "main" {
 
   # デフォルトビヘイビア: S3 (SPA)
   default_cache_behavior {
-    target_origin_id       = "S3Frontend"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
+    target_origin_id           = "S3Frontend"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
 
     forwarded_values {
       query_string = false
@@ -231,12 +265,13 @@ resource "aws_cloudfront_distribution" "main" {
 
   # /api/* ビヘイビア: API Gateway (キャッシュ無効)
   ordered_cache_behavior {
-    path_pattern           = "/api/*"
-    target_origin_id       = "APIGW"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = false
+    path_pattern               = "/api/*"
+    target_origin_id           = "APIGW"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = false
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
 
     forwarded_values {
       query_string = false
