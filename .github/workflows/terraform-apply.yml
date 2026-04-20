@@ -1,0 +1,132 @@
+name: Terraform Apply
+
+# 手動実行専用。main に terraform 変更をマージしたあと、GitHub の Actions UI から
+# 「Run workflow」でトリガーする。
+#
+# mode:
+#   bootstrap: 初回のみ。S3 state バケットを作成し、既存 AWS リソースを state に import する
+#   apply:     通常運用。plan 後に apply まで実行する
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'bootstrap (初回のみ) or apply (通常)'
+        type: choice
+        options:
+          - bootstrap
+          - apply
+        default: apply
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+      TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+      TF_VAR_allow_registration: ${{ vars.ALLOW_REGISTRATION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build frontend
+        env:
+          VITE_ALLOW_REGISTRATION: ${{ vars.ALLOW_REGISTRATION }}
+        run: npm run build
+
+      - name: Bundle Lambda
+        run: |
+          mkdir -p terraform/.lambda-build
+          npx esbuild handler.ts \
+            --bundle \
+            --platform=node \
+            --target=node22 \
+            --format=cjs \
+            --outfile=terraform/.lambda-build/index.js \
+            --define:'import.meta.url="file:///var/task/index.js"' \
+            --log-level=info
+          echo '{"name":"task-app-lambda"}' > terraform/.lambda-build/package.json
+          cd terraform/.lambda-build && zip -r function.zip index.js package.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Ensure state bucket exists (bootstrap)
+        if: inputs.mode == 'bootstrap'
+        run: |
+          set -e
+          BUCKET=task-app-terraform-state-640168430856
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "State bucket already exists"
+          else
+            echo "Creating state bucket"
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region ap-northeast-1 \
+              --create-bucket-configuration LocationConstraint=ap-northeast-1
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-bucket-encryption \
+              --bucket "$BUCKET" \
+              --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+            aws s3api put-public-access-block \
+              --bucket "$BUCKET" \
+              --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+          fi
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Import existing resources (bootstrap only)
+        if: inputs.mode == 'bootstrap'
+        working-directory: terraform
+        run: |
+          # 既に import 済みのリソースは失敗するが、それは想定内なので || true で続行する。
+          # 最終的に terraform plan で差分が残れば import 漏れが検出される。
+          terraform import aws_iam_role.lambda task-app-lambda-role || true
+          terraform import aws_iam_role_policy_attachment.lambda_basic "task-app-lambda-role/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" || true
+          terraform import aws_s3_bucket.frontend task-app-frontend-640168430856 || true
+          terraform import aws_s3_bucket_public_access_block.frontend task-app-frontend-640168430856 || true
+          terraform import aws_s3_bucket_policy.frontend task-app-frontend-640168430856 || true
+          terraform import aws_cloudfront_origin_access_control.frontend E10IGA7326QWK1 || true
+          terraform import aws_cloudfront_function.spa_routing task-app-spa-routing || true
+          terraform import aws_cloudfront_distribution.main EQHWLAZFVG5RH || true
+          terraform import aws_lambda_function.api task-app-api || true
+          terraform import aws_lambda_permission.apigw task-app-api/AllowAPIGateway || true
+          terraform import aws_apigatewayv2_api.api xq9nrq3fci || true
+          terraform import aws_apigatewayv2_integration.lambda xq9nrq3fci/19suwkb || true
+          terraform import aws_apigatewayv2_route.default xq9nrq3fci/49hrk9l || true
+          terraform import 'aws_apigatewayv2_stage.default' 'xq9nrq3fci/$default' || true
+          terraform import aws_ssm_parameter.database_url /task-app/database_url || true
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve tfplan

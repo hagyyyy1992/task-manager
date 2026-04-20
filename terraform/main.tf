@@ -10,6 +10,15 @@ terraform {
       version = "~> 3.0"
     }
   }
+
+  # state は個人AWS上の S3 に保存（CI から apply するため）
+  backend "s3" {
+    bucket       = "task-app-terraform-state-640168430856"
+    key          = "terraform.tfstate"
+    region       = "ap-northeast-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
