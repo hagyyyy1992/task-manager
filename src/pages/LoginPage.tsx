@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../AuthContext'
+import { useAuth } from '../useAuth'
 import { PasswordInput } from '../components/PasswordInput'
 
 export function LoginPage() {
@@ -32,7 +32,10 @@ export function LoginPage() {
           Task Manager
         </h1>
 
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4"
+        >
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">ログイン</h2>
 
           {error && (
@@ -42,7 +45,9 @@ export function LoginPage() {
           )}
 
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">メールアドレス</label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">
+              メールアドレス
+            </label>
             <input
               type="email"
               value={email}
@@ -54,7 +59,13 @@ export function LoginPage() {
             />
           </div>
 
-          <PasswordInput label="パスワード" value={password} onChange={setPassword} required autoComplete="current-password" />
+          <PasswordInput
+            label="パスワード"
+            value={password}
+            onChange={setPassword}
+            required
+            autoComplete="current-password"
+          />
 
           <button
             type="submit"
@@ -67,7 +78,9 @@ export function LoginPage() {
           {import.meta.env.VITE_ALLOW_REGISTRATION === 'true' && (
             <p className="text-center text-sm text-gray-500 dark:text-gray-400">
               アカウントがない場合は{' '}
-              <Link to="/register" className="text-blue-600 hover:underline">新規登録</Link>
+              <Link to="/register" className="text-blue-600 hover:underline">
+                新規登録
+              </Link>
             </p>
           )}
         </form>

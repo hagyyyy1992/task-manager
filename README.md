@@ -21,19 +21,19 @@ task-manager/
 
 ## 技術スタック
 
-| 役割 | 技術 |
-|------|------|
-| フロントエンド | React 19 + TypeScript + Vite + Tailwind CSS |
-| ルーティング | react-router-dom |
-| API サーバー | Node.js (http モジュール) |
-| ORM | Prisma + @prisma/adapter-neon |
-| データベース | Neon PostgreSQL |
-| 認証 | JWT (jose) + crypto.scrypt |
-| ドラッグ&ドロップ | @dnd-kit |
-| テスト | Vitest + @testing-library/react |
-| インフラ | AWS (S3 + CloudFront + Lambda + API Gateway) |
-| IaC | Terraform |
-| CI/CD | GitHub Actions |
+| 役割              | 技術                                         |
+| ----------------- | -------------------------------------------- |
+| フロントエンド    | React 19 + TypeScript + Vite + Tailwind CSS  |
+| ルーティング      | react-router-dom                             |
+| API サーバー      | Node.js (http モジュール)                    |
+| ORM               | Prisma + @prisma/adapter-neon                |
+| データベース      | Neon PostgreSQL                              |
+| 認証              | JWT (jose) + crypto.scrypt                   |
+| ドラッグ&ドロップ | @dnd-kit                                     |
+| テスト            | Vitest + @testing-library/react              |
+| インフラ          | AWS (S3 + CloudFront + Lambda + API Gateway) |
+| IaC               | Terraform                                    |
+| CI/CD             | GitHub Actions                               |
 
 ## セットアップ
 
@@ -97,26 +97,26 @@ npx tsx api-server.ts
 
 ### 認証（公開）
 
-| メソッド | パス | 説明 |
-|---------|------|------|
-| POST | `/api/auth/register` | アカウント登録（利用規約同意必須） |
-| POST | `/api/auth/login` | ログイン（JWT発行） |
+| メソッド | パス                 | 説明                               |
+| -------- | -------------------- | ---------------------------------- |
+| POST     | `/api/auth/register` | アカウント登録（利用規約同意必須） |
+| POST     | `/api/auth/login`    | ログイン（JWT発行）                |
 
 ### 認証必須
 
-| メソッド | パス | 説明 |
-|---------|------|------|
-| GET | `/api/auth/me` | ログインユーザー情報取得 |
-| PATCH | `/api/auth/password` | パスワード変更 |
-| DELETE | `/api/auth/account` | アカウント削除（タスク連動削除） |
-| GET | `/api/tasks` | ユーザーのタスク一覧取得 |
-| POST | `/api/tasks` | タスク作成 |
-| PATCH | `/api/tasks/:id` | タスク更新 |
-| DELETE | `/api/tasks/:id` | タスク削除 |
-| GET | `/api/categories` | ユーザーのカテゴリ一覧取得 |
-| POST | `/api/categories` | カテゴリ作成 |
-| PATCH | `/api/categories/:id` | カテゴリ更新 |
-| DELETE | `/api/categories/:id` | カテゴリ削除 |
+| メソッド | パス                  | 説明                             |
+| -------- | --------------------- | -------------------------------- |
+| GET      | `/api/auth/me`        | ログインユーザー情報取得         |
+| PATCH    | `/api/auth/password`  | パスワード変更                   |
+| DELETE   | `/api/auth/account`   | アカウント削除（タスク連動削除） |
+| GET      | `/api/tasks`          | ユーザーのタスク一覧取得         |
+| POST     | `/api/tasks`          | タスク作成                       |
+| PATCH    | `/api/tasks/:id`      | タスク更新                       |
+| DELETE   | `/api/tasks/:id`      | タスク削除                       |
+| GET      | `/api/categories`     | ユーザーのカテゴリ一覧取得       |
+| POST     | `/api/categories`     | カテゴリ作成                     |
+| PATCH    | `/api/categories/:id` | カテゴリ更新                     |
+| DELETE   | `/api/categories/:id` | カテゴリ削除                     |
 
 ## DB スキーマ
 
@@ -127,11 +127,11 @@ User ─┬── Task (1:N)
       └── Category (1:N)
 ```
 
-| テーブル | 説明 |
-|---------|------|
-| users | ユーザー（メール・パスワード・利用規約同意日時） |
-| tasks | タスク（ユーザー別、カテゴリはテキスト） |
-| categories | カテゴリ（ユーザー別、並び順付き） |
+| テーブル   | 説明                                             |
+| ---------- | ------------------------------------------------ |
+| users      | ユーザー（メール・パスワード・利用規約同意日時） |
+| tasks      | タスク（ユーザー別、カテゴリはテキスト）         |
+| categories | カテゴリ（ユーザー別、並び順付き）               |
 
 ## MCP サーバー
 
@@ -140,13 +140,13 @@ Claude Code からタスクを直接操作するための MCP サーバー。
 
 ### 提供ツール
 
-| ツール | 説明 |
-|--------|------|
-| `list_tasks` | ステータス／カテゴリでフィルタした一覧 |
-| `list_categories` | 自分のカテゴリ一覧 |
-| `create_task` | 新規タスク作成 |
-| `update_task` | ステータス・優先度・メモ等の更新 |
-| `delete_task` | タスク削除 |
+| ツール            | 説明                                   |
+| ----------------- | -------------------------------------- |
+| `list_tasks`      | ステータス／カテゴリでフィルタした一覧 |
+| `list_categories` | 自分のカテゴリ一覧                     |
+| `create_task`     | 新規タスク作成                         |
+| `update_task`     | ステータス・優先度・メモ等の更新       |
+| `delete_task`     | タスク削除                             |
 
 ### セットアップ
 

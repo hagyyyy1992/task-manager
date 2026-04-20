@@ -11,7 +11,14 @@ interface Props {
   onCategoryCreated?: (category: Category) => void
 }
 
-export function TaskForm({ onAdd, onClose, editTask, onUpdate, categories = [], onCategoryCreated }: Props) {
+export function TaskForm({
+  onAdd,
+  onClose,
+  editTask,
+  onUpdate,
+  categories = [],
+  onCategoryCreated,
+}: Props) {
   const [title, setTitle] = useState(editTask?.title ?? '')
   const [status, setStatus] = useState<TaskStatus>(editTask?.status ?? 'todo')
   const [priority, setPriority] = useState<TaskPriority>(editTask?.priority ?? 'medium')
@@ -86,7 +93,9 @@ export function TaskForm({ onAdd, onClose, editTask, onUpdate, categories = [], 
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">ステータス</label>
+            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+              ステータス
+            </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as TaskStatus)}
@@ -124,7 +133,10 @@ export function TaskForm({ onAdd, onClose, editTask, onUpdate, categories = [], 
                 />
                 <button
                   type="button"
-                  onClick={() => { setShowNewCategory(false); setNewCategoryInput('') }}
+                  onClick={() => {
+                    setShowNewCategory(false)
+                    setNewCategoryInput('')
+                  }}
                   className="px-2 text-gray-400 hover:text-gray-600 text-sm"
                   title="既存から選択"
                 >
@@ -139,11 +151,11 @@ export function TaskForm({ onAdd, onClose, editTask, onUpdate, categories = [], 
                   className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 >
                   {categories.map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
+                    <option key={c.id} value={c.name}>
+                      {c.name}
+                    </option>
                   ))}
-                  {categories.length === 0 && (
-                    <option value="その他">その他</option>
-                  )}
+                  {categories.length === 0 && <option value="その他">その他</option>}
                 </select>
                 <button
                   type="button"

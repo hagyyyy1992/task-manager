@@ -30,7 +30,12 @@ export function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export async function register(email: string, password: string, name: string, termsAgreed: boolean): Promise<User> {
+export async function register(
+  email: string,
+  password: string,
+  name: string,
+  termsAgreed: boolean,
+): Promise<User> {
   const res = await fetch(`${API}/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

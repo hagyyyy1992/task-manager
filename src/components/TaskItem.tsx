@@ -52,14 +52,10 @@ export function TaskItem({ task, onStatusChange, onDelete, isDraggable = false }
   const due = formatDueDate(task.dueDate)
   const isDone = task.status === 'done'
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id, disabled: !isDraggable })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    disabled: !isDraggable,
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -98,12 +94,11 @@ export function TaskItem({ task, onStatusChange, onDelete, isDraggable = false }
         {isDone && '✓'}
       </button>
 
-      <div
-        className="flex-1 min-w-0 cursor-pointer"
-        onClick={() => navigate(`/task/${task.id}`)}
-      >
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/task/${task.id}`)}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 ${isDone ? 'line-through' : ''}`}>
+          <span
+            className={`font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 ${isDone ? 'line-through' : ''}`}
+          >
             {task.title}
           </span>
           <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_COLORS[task.status]}`}>
@@ -117,8 +112,13 @@ export function TaskItem({ task, onStatusChange, onDelete, isDraggable = false }
         {(task.memo || due.text) && (
           <div className="mt-1 flex items-center gap-3 text-sm">
             {due.text && (
-              <span className={due.overdue ? 'text-red-600 font-medium' : 'text-gray-500 dark:text-gray-400'}>
-                {due.overdue ? '⚠ ' : ''}{due.text}
+              <span
+                className={
+                  due.overdue ? 'text-red-600 font-medium' : 'text-gray-500 dark:text-gray-400'
+                }
+              >
+                {due.overdue ? '⚠ ' : ''}
+                {due.text}
               </span>
             )}
             {task.memo && (

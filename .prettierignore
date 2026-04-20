@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+package-lock.json
+terraform/.terraform/
+terraform/.lambda-build/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.*
+prisma/migrations/
+src/generated/
+.claude/
+.playwright-mcp/
