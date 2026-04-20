@@ -1,0 +1,6 @@
+set -e
+
+npx lint-staged
+npm run lint
+npm run typecheck
+npm run test
