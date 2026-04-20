@@ -95,6 +95,54 @@ beforeEach(() => {
   process.env.ALLOW_REGISTRATION = 'true'
 })
 
+// ─── CORS テスト ──────────────────────────────────────────────────
+
+describe('CORS', () => {
+  function eventWithOrigin(origin: string | undefined) {
+    return {
+      requestContext: { http: { method: 'OPTIONS' } },
+      rawPath: '/api/tasks',
+      headers: origin ? { origin } : {},
+      isBase64Encoded: false,
+    }
+  }
+
+  it('allowed origin (localhost) is echoed back', async () => {
+    const res = await handler(eventWithOrigin('http://localhost:5173'))
+    expect(res.headers['Access-Control-Allow-Origin']).toBe('http://localhost:5173')
+    expect(res.headers['Vary']).toBe('Origin')
+  })
+
+  it('allowed origin (CloudFront) is echoed back', async () => {
+    const res = await handler(eventWithOrigin('https://d3pi0juuilndgb.cloudfront.net'))
+    expect(res.headers['Access-Control-Allow-Origin']).toBe('https://d3pi0juuilndgb.cloudfront.net')
+  })
+
+  it('disallowed origin is NOT echoed back', async () => {
+    const res = await handler(eventWithOrigin('https://evil.example.com'))
+    expect(res.headers['Access-Control-Allow-Origin']).toBeUndefined()
+    expect(res.headers['Vary']).toBe('Origin')
+  })
+
+  it('missing origin: no Access-Control-Allow-Origin', async () => {
+    const res = await handler(eventWithOrigin(undefined))
+    expect(res.headers['Access-Control-Allow-Origin']).toBeUndefined()
+  })
+
+  it('ALLOWED_ORIGINS env var overrides default allowlist', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://custom.example.com'
+    try {
+      const res = await handler(eventWithOrigin('https://custom.example.com'))
+      expect(res.headers['Access-Control-Allow-Origin']).toBe('https://custom.example.com')
+
+      const res2 = await handler(eventWithOrigin('http://localhost:5173'))
+      expect(res2.headers['Access-Control-Allow-Origin']).toBeUndefined()
+    } finally {
+      delete process.env.ALLOWED_ORIGINS
+    }
+  })
+})
+
 // ─── 既存タスクAPIテスト ──────────────────────────────────────────
 
 describe('task endpoints', () => {
