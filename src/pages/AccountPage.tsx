@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../AuthContext'
+import { useAuth } from '../useAuth'
 import { changePassword } from '../auth'
 import { PasswordInput } from '../components/PasswordInput'
 import { AppHeader } from '../components/AppHeader'
@@ -62,18 +62,26 @@ export function AccountPage() {
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">アカウント情報</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
+            アカウント情報
+          </h2>
           <dl className="space-y-3">
             <div>
-              <dt className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">名前</dt>
+              <dt className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                名前
+              </dt>
               <dd className="text-gray-900 dark:text-gray-100 mt-0.5">{user.name}</dd>
             </div>
             <div>
-              <dt className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">メールアドレス</dt>
+              <dt className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                メールアドレス
+              </dt>
               <dd className="text-gray-900 dark:text-gray-100 mt-0.5">{user.email}</dd>
             </div>
             <div>
-              <dt className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">登録日</dt>
+              <dt className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                登録日
+              </dt>
               <dd className="text-gray-600 dark:text-gray-400 mt-0.5 text-sm">
                 {new Date(user.createdAt).toLocaleDateString('ja-JP')}
               </dd>
@@ -81,7 +89,10 @@ export function AccountPage() {
           </dl>
         </div>
 
-        <form onSubmit={handleChangePassword} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4">
+        <form
+          onSubmit={handleChangePassword}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4"
+        >
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">パスワード変更</h3>
 
           {pwError && (
@@ -95,8 +106,21 @@ export function AccountPage() {
             </div>
           )}
 
-          <PasswordInput label="現在のパスワード" value={currentPassword} onChange={setCurrentPassword} required autoComplete="current-password" />
-          <PasswordInput label="新しいパスワード（8文字以上）" value={newPassword} onChange={setNewPassword} required minLength={8} autoComplete="new-password" />
+          <PasswordInput
+            label="現在のパスワード"
+            value={currentPassword}
+            onChange={setCurrentPassword}
+            required
+            autoComplete="current-password"
+          />
+          <PasswordInput
+            label="新しいパスワード（8文字以上）"
+            value={newPassword}
+            onChange={setNewPassword}
+            required
+            minLength={8}
+            autoComplete="new-password"
+          />
 
           <button
             type="submit"

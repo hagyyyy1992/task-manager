@@ -7,16 +7,24 @@ vi.mock('../store', () => ({
   loadTask: vi.fn(),
   apiUpdateTask: vi.fn(),
   apiDeleteTask: vi.fn(),
-  loadCategories: vi.fn().mockResolvedValue([
-    { id: 'cat1', userId: 'u1', name: 'その他', sortOrder: 0, createdAt: '2026-01-01T00:00:00.000Z' },
-  ]),
+  loadCategories: vi
+    .fn()
+    .mockResolvedValue([
+      {
+        id: 'cat1',
+        userId: 'u1',
+        name: 'その他',
+        sortOrder: 0,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]),
 }))
 
 vi.mock('../auth', () => ({
   authHeaders: vi.fn().mockReturnValue({ Authorization: 'Bearer test' }),
 }))
 
-vi.mock('../AuthContext', () => ({
+vi.mock('../useAuth', () => ({
   useAuth: () => ({
     user: { id: 'u1', name: 'Test', email: 'test@test.com', createdAt: '', updatedAt: '' },
     logout: vi.fn(),
@@ -44,7 +52,7 @@ function renderWithRouter(taskId: string) {
         <Route path="/task/:id" element={<TaskDetailPage />} />
         <Route path="/" element={<div data-testid="list-page">一覧ページ</div>} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   )
 }
 
@@ -86,7 +94,7 @@ describe('TaskDetailPage', () => {
       expect(screen.getByText('テストタスク')).toBeInTheDocument()
     })
 
-    const editBtn = screen.getAllByText('編集').find(el => el.closest('header'))!
+    const editBtn = screen.getAllByText('編集').find((el) => el.closest('header'))!
     fireEvent.click(editBtn)
 
     await waitFor(() => {
@@ -103,14 +111,14 @@ describe('TaskDetailPage', () => {
       expect(screen.getByText('テストタスク')).toBeInTheDocument()
     })
 
-    const editBtn = screen.getAllByText('編集').find(el => el.closest('header'))!
+    const editBtn = screen.getAllByText('編集').find((el) => el.closest('header'))!
     fireEvent.click(editBtn)
 
     await waitFor(() => {
       expect(screen.getByText('保存')).toBeInTheDocument()
     })
 
-    const cancelBtn = screen.getAllByText('キャンセル').find(el => el.closest('main'))!
+    const cancelBtn = screen.getAllByText('キャンセル').find((el) => el.closest('main'))!
     fireEvent.click(cancelBtn)
 
     await waitFor(() => {
@@ -130,7 +138,7 @@ describe('TaskDetailPage', () => {
       expect(screen.getByText('テストタスク')).toBeInTheDocument()
     })
 
-    const deleteBtn = screen.getAllByText('削除').find(el => el.closest('header'))!
+    const deleteBtn = screen.getAllByText('削除').find((el) => el.closest('header'))!
     fireEvent.click(deleteBtn)
 
     await waitFor(() => {
@@ -149,7 +157,7 @@ describe('TaskDetailPage', () => {
       expect(screen.getByText('テストタスク')).toBeInTheDocument()
     })
 
-    const deleteBtn = screen.getAllByText('削除').find(el => el.closest('header'))!
+    const deleteBtn = screen.getAllByText('削除').find((el) => el.closest('header'))!
     fireEvent.click(deleteBtn)
 
     expect(apiDeleteTask).not.toHaveBeenCalled()
