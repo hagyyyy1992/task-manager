@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.11.0" # use_lockfile (S3 native locking) が 1.11+ で利用可能
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -9,6 +9,15 @@ terraform {
       source  = "hashicorp/null"
       version = "~> 3.0"
     }
+  }
+
+  # state は個人AWS上の S3 に保存（CI から apply するため）
+  backend "s3" {
+    bucket       = "task-app-terraform-state-640168430856"
+    key          = "terraform.tfstate"
+    region       = "ap-northeast-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 
@@ -108,6 +117,12 @@ resource "aws_lambda_function" "api" {
       ALLOW_REGISTRATION = var.allow_registration
       JWT_SECRET         = var.jwt_secret
     }
+  }
+
+  # Lambda コード自体は deploy.yml (main への push で発火) が責任を持つ。
+  # terraform はインフラ定義のみを管理し、コード差し戻し事故を防ぐ。
+  lifecycle {
+    ignore_changes = [filename, source_code_hash]
   }
 }
 
