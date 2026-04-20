@@ -18,6 +18,7 @@ import {
 } from './db.js'
 import type { Task } from './db.js'
 import { hashPassword, verifyPassword, createToken, verifyToken } from './auth.js'
+import { corsHeaders } from './cors.js'
 
 function readBody(req: import('http').IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
@@ -38,9 +39,9 @@ function getToken(req: import('http').IncomingMessage): string | null {
 }
 
 const server = createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  for (const [key, value] of Object.entries(corsHeaders(req.headers.origin))) {
+    res.setHeader(key, value)
+  }
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204)

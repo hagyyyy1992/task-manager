@@ -17,13 +17,7 @@ import {
 } from './db.js'
 import type { Task } from './db.js'
 import { hashPassword, verifyPassword, createToken, verifyToken } from './auth.js'
-
-const headers = {
-  'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-}
+import { corsHeaders } from './cors.js'
 
 interface LambdaEvent {
   requestContext: { http: { method: string } }
@@ -53,6 +47,11 @@ function getToken(event: LambdaEvent): string | null {
 export const handler = async (event: LambdaEvent) => {
   const method = event.requestContext.http.method
   const path = event.rawPath
+  const origin = event.headers?.origin ?? event.headers?.Origin
+  const headers = {
+    'Content-Type': 'application/json',
+    ...corsHeaders(origin),
+  }
 
   if (method === 'OPTIONS') {
     return { statusCode: 204, headers, body: '' }

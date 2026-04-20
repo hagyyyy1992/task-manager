@@ -225,7 +225,15 @@ resource "aws_cloudfront_distribution" "main" {
 
     forwarded_values {
       query_string = false
-      headers      = ["Content-Type", "Authorization"]
+      # Origin と CORS プリフライト関連は CORS allowlist 判定のため Lambda に透過転送する。
+      # max_ttl = 0 のためキャッシュキー拡大による副作用なし。
+      headers = [
+        "Content-Type",
+        "Authorization",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+      ]
       cookies { forward = "none" }
     }
 
