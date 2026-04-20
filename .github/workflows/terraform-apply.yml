@@ -72,6 +72,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.4
 
       - name: Ensure state bucket exists (bootstrap)
         if: inputs.mode == 'bootstrap'
@@ -105,23 +107,41 @@ jobs:
         if: inputs.mode == 'bootstrap'
         working-directory: terraform
         run: |
-          # 既に import 済みのリソースは失敗するが、それは想定内なので || true で続行する。
-          # 最終的に terraform plan で差分が残れば import 漏れが検出される。
-          terraform import aws_iam_role.lambda task-app-lambda-role || true
-          terraform import aws_iam_role_policy_attachment.lambda_basic "task-app-lambda-role/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" || true
-          terraform import aws_s3_bucket.frontend task-app-frontend-640168430856 || true
-          terraform import aws_s3_bucket_public_access_block.frontend task-app-frontend-640168430856 || true
-          terraform import aws_s3_bucket_policy.frontend task-app-frontend-640168430856 || true
-          terraform import aws_cloudfront_origin_access_control.frontend E10IGA7326QWK1 || true
-          terraform import aws_cloudfront_function.spa_routing task-app-spa-routing || true
-          terraform import aws_cloudfront_distribution.main EQHWLAZFVG5RH || true
-          terraform import aws_lambda_function.api task-app-api || true
-          terraform import aws_lambda_permission.apigw task-app-api/AllowAPIGateway || true
-          terraform import aws_apigatewayv2_api.api xq9nrq3fci || true
-          terraform import aws_apigatewayv2_integration.lambda xq9nrq3fci/19suwkb || true
-          terraform import aws_apigatewayv2_route.default xq9nrq3fci/49hrk9l || true
-          terraform import 'aws_apigatewayv2_stage.default' 'xq9nrq3fci/$default' || true
-          terraform import aws_ssm_parameter.database_url /task-app/database_url || true
+          # 既に state に存在するリソースは "Resource already managed by Terraform" で
+          # 失敗するが、それだけは想定内として許容する。それ以外の失敗（権限不足、ID 誤り等）
+          # は即 fail して止めることで、plan 段階での混乱を避ける。
+          safe_import() {
+            local addr="$1"
+            local id="$2"
+            echo "=== importing $addr ==="
+            if output=$(terraform import "$addr" "$id" 2>&1); then
+              echo "$output"
+            else
+              echo "$output"
+              if echo "$output" | grep -q 'Resource already managed by Terraform'; then
+                echo "(already imported, skipping)"
+              else
+                echo "❌ import failed unexpectedly"
+                return 1
+              fi
+            fi
+          }
+
+          safe_import aws_iam_role.lambda task-app-lambda-role
+          safe_import aws_iam_role_policy_attachment.lambda_basic "task-app-lambda-role/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          safe_import aws_s3_bucket.frontend task-app-frontend-640168430856
+          safe_import aws_s3_bucket_public_access_block.frontend task-app-frontend-640168430856
+          safe_import aws_s3_bucket_policy.frontend task-app-frontend-640168430856
+          safe_import aws_cloudfront_origin_access_control.frontend E10IGA7326QWK1
+          safe_import aws_cloudfront_function.spa_routing task-app-spa-routing
+          safe_import aws_cloudfront_distribution.main EQHWLAZFVG5RH
+          safe_import aws_lambda_function.api task-app-api
+          safe_import aws_lambda_permission.apigw task-app-api/AllowAPIGateway
+          safe_import aws_apigatewayv2_api.api xq9nrq3fci
+          safe_import aws_apigatewayv2_integration.lambda xq9nrq3fci/19suwkb
+          safe_import aws_apigatewayv2_route.default xq9nrq3fci/49hrk9l
+          safe_import 'aws_apigatewayv2_stage.default' 'xq9nrq3fci/$default'
+          safe_import aws_ssm_parameter.database_url /task-app/database_url
 
       - name: Terraform Plan
         working-directory: terraform
