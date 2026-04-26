@@ -264,11 +264,12 @@ export const handler = async (event: LambdaEvent) => {
     if (categoryPatchMatch && method === 'PATCH') {
       const id = categoryPatchMatch[1]
       const updates = parseBody(event) as { name?: string; sortOrder?: number }
-      if (updates.name !== undefined && !updates.name.trim()) {
+      const trimmedName = updates.name?.trim()
+      if (updates.name !== undefined && !trimmedName) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'name is required' }) }
       }
       try {
-        const updated = await updateCategory(id, { ...updates, name: updates.name?.trim() }, userId)
+        const updated = await updateCategory(id, { ...updates, name: trimmedName }, userId)
         if (!updated) {
           return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
         }
