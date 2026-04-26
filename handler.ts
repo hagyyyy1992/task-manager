@@ -14,6 +14,8 @@ import {
   updateCategory,
   deleteCategory,
   seedDefaultCategories,
+  CategoryProtectedError,
+  CategoryDuplicateError,
 } from './db.js'
 import type { Task } from './db.js'
 import { hashPassword, verifyPassword, createToken, verifyToken } from './auth.js'
@@ -36,6 +38,22 @@ function parseBody(event: LambdaEvent): unknown {
 
 function generateId(): string {
   return randomUUID()
+}
+
+function isValidSortOrder(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+function isPrismaUniqueViolationOnName(e: unknown): boolean {
+  if (!e || typeof e !== 'object') return false
+  const err = e as { code?: unknown; meta?: { target?: unknown } }
+  if (err.code !== 'P2002') return false
+  const target = err.meta?.target
+  // target は string[] のことが多いが、PG では文字列のことも
+  if (Array.isArray(target)) return target.includes('name')
+  if (typeof target === 'string') return target.includes('name')
+  // target が無い場合は安全側で true（Category 唯一の unique 制約は (userId, name)）
+  return target === undefined
 }
 
 function getToken(event: LambdaEvent): string | null {
@@ -254,6 +272,9 @@ export const handler = async (event: LambdaEvent) => {
       if (!name || !name.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'name is required' }) }
       }
+      if (sortOrder !== undefined && !isValidSortOrder(sortOrder)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid sortOrder' }) }
+      }
       const category = await createCategory(userId, name.trim(), sortOrder)
       return { statusCode: 201, headers, body: JSON.stringify(category) }
     }
@@ -263,22 +284,50 @@ export const handler = async (event: LambdaEvent) => {
     if (categoryPatchMatch && method === 'PATCH') {
       const id = categoryPatchMatch[1]
       const updates = parseBody(event) as { name?: string; sortOrder?: number }
-      const updated = await updateCategory(id, updates, userId)
-      if (!updated) {
-        return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+      const trimmedName = updates.name?.trim()
+      if (updates.name !== undefined && !trimmedName) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'name is required' }) }
       }
-      return { statusCode: 200, headers, body: JSON.stringify(updated) }
+      if (updates.sortOrder !== undefined && !isValidSortOrder(updates.sortOrder)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid sortOrder' }) }
+      }
+      try {
+        const updated = await updateCategory(id, { ...updates, name: trimmedName }, userId)
+        if (!updated) {
+          return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+        }
+        return { statusCode: 200, headers, body: JSON.stringify(updated) }
+      } catch (e: unknown) {
+        if (e instanceof CategoryProtectedError) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: e.message }) }
+        }
+        if (e instanceof CategoryDuplicateError || isPrismaUniqueViolationOnName(e)) {
+          return {
+            statusCode: 409,
+            headers,
+            body: JSON.stringify({ error: '同じ名前のカテゴリが既に存在します' }),
+          }
+        }
+        throw e
+      }
     }
 
     // DELETE /api/categories/:id
     const categoryDeleteMatch = path.match(/^\/api\/categories\/(.+)$/)
     if (categoryDeleteMatch && method === 'DELETE') {
       const id = categoryDeleteMatch[1]
-      const deleted = await deleteCategory(id, userId)
-      if (!deleted) {
-        return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+      try {
+        const deleted = await deleteCategory(id, userId)
+        if (!deleted) {
+          return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+        }
+        return { statusCode: 200, headers, body: JSON.stringify({ message: 'deleted' }) }
+      } catch (e: unknown) {
+        if (e instanceof CategoryProtectedError) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: e.message }) }
+        }
+        throw e
       }
-      return { statusCode: 200, headers, body: JSON.stringify({ message: 'deleted' }) }
     }
 
     // ─── Tasks ────────────────────────────────────────────────────────
@@ -301,7 +350,7 @@ export const handler = async (event: LambdaEvent) => {
     if (patchMatch && method === 'PATCH') {
       const id = patchMatch[1]
       const updates = parseBody(event) as Partial<
-        Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate'>
+        Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category'>
       >
       const updated = await updateTask(id, updates, userId)
       if (!updated) {

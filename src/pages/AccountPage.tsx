@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../useAuth'
 import { changePassword } from '../auth'
 import { PasswordInput } from '../components/PasswordInput'
@@ -130,6 +130,18 @@ export function AccountPage() {
             {pwSubmitting ? '変更中...' : 'パスワードを変更'}
           </button>
         </form>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            カテゴリ管理
+          </h3>
+          <Link
+            to="/categories"
+            className="inline-block px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium"
+          >
+            カテゴリの編集・削除
+          </Link>
+        </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
           <button
