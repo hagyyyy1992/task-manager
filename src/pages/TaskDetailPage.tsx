@@ -75,8 +75,14 @@ export function TaskDetailPage() {
         setCategories((prev) =>
           prev.find((c) => c.name === created.name) ? prev : [...prev, created],
         )
-      } catch {
-        // 既に存在する場合は無視して続行
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        // 同名カテゴリが既にある場合のみ続行（サーバの既存メッセージに合わせる）
+        if (!msg.includes('既に存在')) {
+          console.error(e)
+          alert(`カテゴリ作成に失敗しました: ${msg}`)
+          return
+        }
       }
     }
 
