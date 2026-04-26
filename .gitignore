@@ -12,3 +12,4 @@ terraform/.terraform.tfstate.lock.info
 terraform/.lambda-build/
 
 /src/generated/prisma
+coverage/
