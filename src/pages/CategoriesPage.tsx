@@ -70,6 +70,10 @@ export function CategoriesPage() {
       cancelEdit()
       return
     }
+    if (categories.some((x) => x.id !== c.id && x.name === name)) {
+      setError('同じ名前のカテゴリが既に存在します')
+      return
+    }
     try {
       const updated = await apiUpdateCategory(c.id, { name })
       setCategories((prev) => prev.map((x) => (x.id === c.id ? updated : x)))
@@ -121,6 +125,10 @@ export function CategoriesPage() {
     e.preventDefault()
     const name = newName.trim()
     if (!name) return
+    if (categories.some((c) => c.name === name)) {
+      setError('同じ名前のカテゴリが既に存在します')
+      return
+    }
     setCreating(true)
     setError('')
     try {
