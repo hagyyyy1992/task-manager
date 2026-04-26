@@ -778,6 +778,21 @@ describe('PATCH /api/categories/:id (重複名)', () => {
     expect(updateCategory).not.toHaveBeenCalled()
   })
 
+  it('不正なsortOrderは400を返す', async () => {
+    const res = await handler(
+      event('PATCH', '/api/categories/cat123', { sortOrder: 'not-a-number' }),
+    )
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('sortOrder')
+    expect(updateCategory).not.toHaveBeenCalled()
+  })
+
+  it('負のsortOrderは400を返す', async () => {
+    const res = await handler(event('PATCH', '/api/categories/cat123', { sortOrder: -1 }))
+    expect(res.statusCode).toBe(400)
+    expect(updateCategory).not.toHaveBeenCalled()
+  })
+
   it('「その他」のリネームは400を返す', async () => {
     vi.mocked(updateCategory).mockRejectedValue(
       new CategoryProtectedError('「その他」カテゴリの名前は変更できません'),

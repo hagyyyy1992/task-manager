@@ -39,6 +39,10 @@ function generateId(): string {
   return randomUUID()
 }
 
+function isValidSortOrder(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 function getToken(event: LambdaEvent): string | null {
   const auth = event.headers?.authorization || event.headers?.Authorization
   if (!auth?.startsWith('Bearer ')) return null
@@ -255,6 +259,9 @@ export const handler = async (event: LambdaEvent) => {
       if (!name || !name.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'name is required' }) }
       }
+      if (sortOrder !== undefined && !isValidSortOrder(sortOrder)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid sortOrder' }) }
+      }
       const category = await createCategory(userId, name.trim(), sortOrder)
       return { statusCode: 201, headers, body: JSON.stringify(category) }
     }
@@ -267,6 +274,9 @@ export const handler = async (event: LambdaEvent) => {
       const trimmedName = updates.name?.trim()
       if (updates.name !== undefined && !trimmedName) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'name is required' }) }
+      }
+      if (updates.sortOrder !== undefined && !isValidSortOrder(updates.sortOrder)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid sortOrder' }) }
       }
       try {
         const updated = await updateCategory(id, { ...updates, name: trimmedName }, userId)
