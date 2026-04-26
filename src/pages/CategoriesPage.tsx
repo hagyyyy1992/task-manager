@@ -203,19 +203,24 @@ export function CategoriesPage() {
                         </>
                       ) : (
                         <>
-                          <button
-                            onClick={() => startEdit(c)}
-                            className="px-3 py-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-sm"
-                          >
-                            編集
-                          </button>
                           {!isProtected && (
-                            <button
-                              onClick={() => deleteCat(c)}
-                              className="px-3 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-sm"
-                            >
-                              削除
-                            </button>
+                            <>
+                              <button
+                                onClick={() => startEdit(c)}
+                                className="px-3 py-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-sm"
+                              >
+                                編集
+                              </button>
+                              <button
+                                onClick={() => deleteCat(c)}
+                                className="px-3 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-sm"
+                              >
+                                削除
+                              </button>
+                            </>
+                          )}
+                          {isProtected && (
+                            <span className="px-3 py-1 text-xs text-gray-400">既定</span>
                           )}
                         </>
                       )}

@@ -777,4 +777,13 @@ describe('PATCH /api/categories/:id (重複名)', () => {
     expect(res.statusCode).toBe(400)
     expect(updateCategory).not.toHaveBeenCalled()
   })
+
+  it('「その他」のリネームは400を返す', async () => {
+    vi.mocked(updateCategory).mockRejectedValue(
+      new CategoryProtectedError('「その他」カテゴリの名前は変更できません'),
+    )
+    const res = await handler(event('PATCH', '/api/categories/cat-sonota', { name: 'ゴミ箱' }))
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('その他')
+  })
 })

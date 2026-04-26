@@ -274,6 +274,9 @@ export const handler = async (event: LambdaEvent) => {
         }
         return { statusCode: 200, headers, body: JSON.stringify(updated) }
       } catch (e: unknown) {
+        if (e instanceof CategoryProtectedError) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: e.message }) }
+        }
         if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'P2002') {
           return {
             statusCode: 409,

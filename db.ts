@@ -296,13 +296,17 @@ export async function updateCategory(
   const existing = await prisma.category.findFirst({ where: { id, userId } })
   if (!existing) return null
 
-  const data: Record<string, unknown> = {}
-  if (updates.name !== undefined) data.name = updates.name
-  if (updates.sortOrder !== undefined) data.sortOrder = updates.sortOrder
-
   const oldName = existing.name
   const newName = updates.name
   const renaming = newName !== undefined && newName !== oldName
+
+  if (renaming && oldName === FALLBACK_CATEGORY_NAME) {
+    throw new CategoryProtectedError(`「${FALLBACK_CATEGORY_NAME}」カテゴリの名前は変更できません`)
+  }
+
+  const data: Record<string, unknown> = {}
+  if (updates.name !== undefined) data.name = updates.name
+  if (updates.sortOrder !== undefined) data.sortOrder = updates.sortOrder
 
   const updated = await prisma.$transaction(async (tx) => {
     if (renaming) {
