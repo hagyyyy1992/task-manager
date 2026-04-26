@@ -77,7 +77,9 @@ export function CategoriesPage() {
     try {
       const updated = await apiUpdateCategory(c.id, { name })
       setCategories((prev) => prev.map((x) => (x.id === c.id ? updated : x)))
-      setTasks((prev) => prev.map((t) => (t.category === c.name ? { ...t, category: name } : t)))
+      // tasks.category はサーバ側で updateMany されるため、再取得して整合性を取る
+      const freshTasks = await loadTasks()
+      setTasks(freshTasks)
       cancelEdit()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
