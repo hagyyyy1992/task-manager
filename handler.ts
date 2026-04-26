@@ -43,6 +43,18 @@ function isValidSortOrder(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
 }
 
+function isPrismaUniqueViolationOnName(e: unknown): boolean {
+  if (!e || typeof e !== 'object') return false
+  const err = e as { code?: unknown; meta?: { target?: unknown } }
+  if (err.code !== 'P2002') return false
+  const target = err.meta?.target
+  // target は string[] のことが多いが、PG では文字列のことも
+  if (Array.isArray(target)) return target.includes('name')
+  if (typeof target === 'string') return target.includes('name')
+  // target が無い場合は安全側で true（Category 唯一の unique 制約は (userId, name)）
+  return target === undefined
+}
+
 function getToken(event: LambdaEvent): string | null {
   const auth = event.headers?.authorization || event.headers?.Authorization
   if (!auth?.startsWith('Bearer ')) return null
@@ -288,7 +300,7 @@ export const handler = async (event: LambdaEvent) => {
         if (e instanceof CategoryProtectedError) {
           return { statusCode: 400, headers, body: JSON.stringify({ error: e.message }) }
         }
-        if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'P2002') {
+        if (isPrismaUniqueViolationOnName(e)) {
           return {
             statusCode: 409,
             headers,

@@ -765,11 +765,25 @@ describe('DELETE /api/categories/:id', () => {
 describe('PATCH /api/categories/:id (重複名)', () => {
   it('一意制約違反は409を返す', async () => {
     vi.mocked(updateCategory).mockRejectedValue(
-      Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      Object.assign(new Error('Unique constraint failed'), {
+        code: 'P2002',
+        meta: { target: ['userId', 'name'] },
+      }),
     )
     const res = await handler(event('PATCH', '/api/categories/cat123', { name: '既存名' }))
     expect(res.statusCode).toBe(409)
     expect(JSON.parse(res.body).error).toContain('既に存在')
+  })
+
+  it('name 以外の P2002 は 500 にフォールバックする', async () => {
+    vi.mocked(updateCategory).mockRejectedValue(
+      Object.assign(new Error('Unique constraint failed'), {
+        code: 'P2002',
+        meta: { target: ['some_other_unique'] },
+      }),
+    )
+    const res = await handler(event('PATCH', '/api/categories/cat123', { name: 'foo' }))
+    expect(res.statusCode).toBe(500)
   })
 
   it('空文字nameは400を返す', async () => {
