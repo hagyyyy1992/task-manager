@@ -26,7 +26,7 @@ export async function apiCreateTask(task: Task): Promise<void> {
 
 export async function apiUpdateTask(
   id: string,
-  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate'>>,
+  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category'>>,
 ): Promise<Task> {
   const res = await fetch(`${API}/${id}`, {
     method: 'PATCH',
@@ -63,6 +63,16 @@ export async function apiCreateCategory(name: string, sortOrder?: number): Promi
   return await res.json()
 }
 
+async function readError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: string }
+    if (body.error) return body.error
+  } catch {
+    // ignore
+  }
+  return `${fallback}: ${res.status}`
+}
+
 export async function apiUpdateCategory(
   id: string,
   updates: { name?: string; sortOrder?: number },
@@ -72,7 +82,7 @@ export async function apiUpdateCategory(
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(updates),
   })
-  if (!res.ok) throw new Error(`Failed to update category: ${res.status}`)
+  if (!res.ok) throw new Error(await readError(res, 'Failed to update category'))
   return await res.json()
 }
 
@@ -81,7 +91,7 @@ export async function apiDeleteCategory(id: string): Promise<void> {
     method: 'DELETE',
     headers: authHeaders(),
   })
-  if (!res.ok) throw new Error(`Failed to delete category: ${res.status}`)
+  if (!res.ok) throw new Error(await readError(res, 'Failed to delete category'))
 }
 
 export function generateId(): string {

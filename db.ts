@@ -95,7 +95,7 @@ export async function createTask(task: Task, userId: string): Promise<void> {
 
 export async function updateTask(
   id: string,
-  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate'>>,
+  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category'>>,
   userId: string,
 ): Promise<Task | null> {
   const existing = await prisma.task.findFirst({ where: { id, userId } })
@@ -107,6 +107,7 @@ export async function updateTask(
   if (updates.status !== undefined) data.status = updates.status
   if (updates.priority !== undefined) data.priority = updates.priority
   if (updates.memo !== undefined) data.memo = updates.memo
+  if (updates.category !== undefined) data.category = updates.category
   if (updates.dueDate !== undefined) {
     data.dueDate = updates.dueDate ? new Date(updates.dueDate + 'T00:00:00Z') : null
   }
@@ -278,6 +279,15 @@ export async function createCategory(
   return dbCategoryToCategory(row)
 }
 
+export const FALLBACK_CATEGORY_NAME = 'その他'
+
+export class CategoryProtectedError extends Error {
+  constructor(message = `「${FALLBACK_CATEGORY_NAME}」カテゴリは削除できません`) {
+    super(message)
+    this.name = 'CategoryProtectedError'
+  }
+}
+
 export async function updateCategory(
   id: string,
   updates: { name?: string; sortOrder?: number },
@@ -290,13 +300,50 @@ export async function updateCategory(
   if (updates.name !== undefined) data.name = updates.name
   if (updates.sortOrder !== undefined) data.sortOrder = updates.sortOrder
 
-  const updated = await prisma.category.update({ where: { id }, data })
+  const oldName = existing.name
+  const newName = updates.name
+  const renaming = newName !== undefined && newName !== oldName
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (renaming) {
+      await tx.task.updateMany({
+        where: { userId, category: oldName },
+        data: { category: newName },
+      })
+    }
+    return tx.category.update({ where: { id }, data })
+  })
+
   return dbCategoryToCategory(updated)
 }
 
 export async function deleteCategory(id: string, userId: string): Promise<boolean> {
   const existing = await prisma.category.findFirst({ where: { id, userId } })
   if (!existing) return false
-  await prisma.category.delete({ where: { id } })
+
+  if (existing.name === FALLBACK_CATEGORY_NAME) {
+    throw new CategoryProtectedError()
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const fallback = await tx.category.findFirst({
+      where: { userId, name: FALLBACK_CATEGORY_NAME },
+    })
+    if (!fallback) {
+      const max = await tx.category.aggregate({
+        where: { userId },
+        _max: { sortOrder: true },
+      })
+      const nextOrder = (max._max.sortOrder ?? -1) + 1
+      await tx.category.create({
+        data: { userId, name: FALLBACK_CATEGORY_NAME, sortOrder: nextOrder },
+      })
+    }
+    await tx.task.updateMany({
+      where: { userId, category: existing.name },
+      data: { category: FALLBACK_CATEGORY_NAME },
+    })
+    await tx.category.delete({ where: { id } })
+  })
   return true
 }

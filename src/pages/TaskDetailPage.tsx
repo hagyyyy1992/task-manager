@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { AppHeader } from '../components/AppHeader'
 import type { Task, TaskStatus, TaskPriority, Category } from '../types'
-import { loadTask, apiUpdateTask, apiDeleteTask, loadCategories } from '../store'
+import { loadTask, apiUpdateTask, apiDeleteTask, loadCategories, apiCreateCategory } from '../store'
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: '未着手',
@@ -42,6 +42,8 @@ export function TaskDetailPage() {
   const [category, setCategory] = useState<string>('その他')
   const [dueDate, setDueDate] = useState('')
   const [memo, setMemo] = useState('')
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCategoryInput, setNewCategoryInput] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -64,24 +66,42 @@ export function TaskDetailPage() {
 
   const handleSave = async () => {
     if (!task || !title.trim()) return
+
+    let finalCategory = category
+    if (showNewCategory && newCategoryInput.trim()) {
+      finalCategory = newCategoryInput.trim()
+      try {
+        const created = await apiCreateCategory(finalCategory, categories.length)
+        setCategories((prev) =>
+          prev.find((c) => c.name === created.name) ? prev : [...prev, created],
+        )
+      } catch {
+        // 既に存在する場合は無視して続行
+      }
+    }
+
     const now = new Date().toISOString()
     const updated: Task = {
       ...task,
       title: title.trim(),
       status,
       priority,
-      category,
+      category: finalCategory,
       dueDate: dueDate || null,
       memo,
       updatedAt: now,
     }
     setTask(updated)
+    setCategory(finalCategory)
+    setShowNewCategory(false)
+    setNewCategoryInput('')
     setEditing(false)
     try {
       await apiUpdateTask(task.id, {
         title: updated.title,
         status: updated.status,
         priority: updated.priority,
+        category: updated.category,
         memo: updated.memo,
         dueDate: updated.dueDate,
       })
@@ -187,18 +207,53 @@ export function TaskDetailPage() {
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">
                   カテゴリ
                 </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                  {categories.length === 0 && <option value={category}>{category}</option>}
-                </select>
+                {showNewCategory ? (
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={newCategoryInput}
+                      onChange={(e) => setNewCategoryInput(e.target.value)}
+                      placeholder="新しいカテゴリ名"
+                      className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewCategory(false)
+                        setNewCategoryInput('')
+                      }}
+                      className="px-2 text-gray-400 hover:text-gray-600 text-sm"
+                      title="既存から選択"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                    >
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                      {!categories.find((c) => c.name === category) && (
+                        <option value={category}>{category}</option>
+                      )}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewCategory(true)}
+                      className="px-2 text-blue-500 hover:text-blue-700 text-sm whitespace-nowrap"
+                      title="新規カテゴリ"
+                    >
+                      + 新規
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -236,6 +291,8 @@ export function TaskDetailPage() {
                   setCategory(task.category as string)
                   setDueDate(task.dueDate ?? '')
                   setMemo(task.memo)
+                  setShowNewCategory(false)
+                  setNewCategoryInput('')
                 }}
                 className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm"
               >

@@ -14,6 +14,7 @@ import {
   updateCategory,
   deleteCategory,
   seedDefaultCategories,
+  CategoryProtectedError,
 } from './db.js'
 import type { Task } from './db.js'
 import { hashPassword, verifyPassword, createToken, verifyToken } from './auth.js'
@@ -263,22 +264,43 @@ export const handler = async (event: LambdaEvent) => {
     if (categoryPatchMatch && method === 'PATCH') {
       const id = categoryPatchMatch[1]
       const updates = parseBody(event) as { name?: string; sortOrder?: number }
-      const updated = await updateCategory(id, updates, userId)
-      if (!updated) {
-        return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+      if (updates.name !== undefined && !updates.name.trim()) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'name is required' }) }
       }
-      return { statusCode: 200, headers, body: JSON.stringify(updated) }
+      try {
+        const updated = await updateCategory(id, { ...updates, name: updates.name?.trim() }, userId)
+        if (!updated) {
+          return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+        }
+        return { statusCode: 200, headers, body: JSON.stringify(updated) }
+      } catch (e: unknown) {
+        if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'P2002') {
+          return {
+            statusCode: 409,
+            headers,
+            body: JSON.stringify({ error: '同じ名前のカテゴリが既に存在します' }),
+          }
+        }
+        throw e
+      }
     }
 
     // DELETE /api/categories/:id
     const categoryDeleteMatch = path.match(/^\/api\/categories\/(.+)$/)
     if (categoryDeleteMatch && method === 'DELETE') {
       const id = categoryDeleteMatch[1]
-      const deleted = await deleteCategory(id, userId)
-      if (!deleted) {
-        return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+      try {
+        const deleted = await deleteCategory(id, userId)
+        if (!deleted) {
+          return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) }
+        }
+        return { statusCode: 200, headers, body: JSON.stringify({ message: 'deleted' }) }
+      } catch (e: unknown) {
+        if (e instanceof CategoryProtectedError) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: e.message }) }
+        }
+        throw e
       }
-      return { statusCode: 200, headers, body: JSON.stringify({ message: 'deleted' }) }
     }
 
     // ─── Tasks ────────────────────────────────────────────────────────
@@ -301,7 +323,7 @@ export const handler = async (event: LambdaEvent) => {
     if (patchMatch && method === 'PATCH') {
       const id = patchMatch[1]
       const updates = parseBody(event) as Partial<
-        Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate'>
+        Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category'>
       >
       const updated = await updateTask(id, updates, userId)
       if (!updated) {

@@ -1,22 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Task } from './db.js'
 
-vi.mock('./db.js', () => ({
-  loadTasks: vi.fn(),
-  createTask: vi.fn(),
-  updateTask: vi.fn(),
-  deleteTask: vi.fn(),
-  findUserByEmail: vi.fn(),
-  findUserById: vi.fn(),
-  createUser: vi.fn(),
-  updateUserPassword: vi.fn(),
-  deleteUser: vi.fn(),
-  loadCategories: vi.fn(),
-  createCategory: vi.fn(),
-  updateCategory: vi.fn(),
-  deleteCategory: vi.fn(),
-  seedDefaultCategories: vi.fn(),
-}))
+vi.mock('./db.js', () => {
+  class CategoryProtectedError extends Error {
+    constructor(message = '「その他」カテゴリは削除できません') {
+      super(message)
+      this.name = 'CategoryProtectedError'
+    }
+  }
+  return {
+    loadTasks: vi.fn(),
+    createTask: vi.fn(),
+    updateTask: vi.fn(),
+    deleteTask: vi.fn(),
+    findUserByEmail: vi.fn(),
+    findUserById: vi.fn(),
+    createUser: vi.fn(),
+    updateUserPassword: vi.fn(),
+    deleteUser: vi.fn(),
+    loadCategories: vi.fn(),
+    createCategory: vi.fn(),
+    updateCategory: vi.fn(),
+    deleteCategory: vi.fn(),
+    seedDefaultCategories: vi.fn(),
+    CategoryProtectedError,
+  }
+})
 
 vi.mock('./auth.js', () => ({
   hashPassword: vi.fn().mockResolvedValue('hashed'),
@@ -40,6 +49,7 @@ import {
   updateCategory,
   deleteCategory,
   seedDefaultCategories,
+  CategoryProtectedError,
 } from './db.js'
 import { verifyPassword, verifyToken } from './auth.js'
 import { handler } from './handler.js'
@@ -173,6 +183,15 @@ describe('task endpoints', () => {
     expect(res.statusCode).toBe(200)
     expect(updateTask).toHaveBeenCalledWith('test123', { status: 'done' }, 'user123')
     expect(JSON.parse(res.body).status).toBe('done')
+  })
+
+  it('PATCH /api/tasks/:id updates a task category', async () => {
+    const updated = { ...mockTask, category: '新カテゴリ' }
+    vi.mocked(updateTask).mockResolvedValue(updated)
+    const res = await handler(event('PATCH', '/api/tasks/test123', { category: '新カテゴリ' }))
+    expect(res.statusCode).toBe(200)
+    expect(updateTask).toHaveBeenCalledWith('test123', { category: '新カテゴリ' }, 'user123')
+    expect(JSON.parse(res.body).category).toBe('新カテゴリ')
   })
 
   it('PATCH /api/tasks/:id returns 404 for unknown id', async () => {
@@ -730,8 +749,32 @@ describe('DELETE /api/categories/:id', () => {
     expect(res.statusCode).toBe(404)
   })
 
+  it('「その他」カテゴリ削除は400を返す', async () => {
+    vi.mocked(deleteCategory).mockRejectedValue(new CategoryProtectedError())
+    const res = await handler(event('DELETE', '/api/categories/cat-sonota'))
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('その他')
+  })
+
   it('returns 401 without authentication', async () => {
     const res = await handler(event('DELETE', '/api/categories/cat123', undefined, false))
     expect(res.statusCode).toBe(401)
+  })
+})
+
+describe('PATCH /api/categories/:id (重複名)', () => {
+  it('一意制約違反は409を返す', async () => {
+    vi.mocked(updateCategory).mockRejectedValue(
+      Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+    )
+    const res = await handler(event('PATCH', '/api/categories/cat123', { name: '既存名' }))
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).error).toContain('既に存在')
+  })
+
+  it('空文字nameは400を返す', async () => {
+    const res = await handler(event('PATCH', '/api/categories/cat123', { name: '   ' }))
+    expect(res.statusCode).toBe(400)
+    expect(updateCategory).not.toHaveBeenCalled()
   })
 })
