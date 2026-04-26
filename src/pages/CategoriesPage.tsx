@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   DndContext,
@@ -148,6 +148,9 @@ export function CategoriesPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
+  // 並び替えリクエストの直列化用。最新の seq だけが state を上書きできる
+  const reorderSeqRef = useRef(0)
+
   useEffect(() => {
     let cancelled = false
     loadCategories()
@@ -249,13 +252,17 @@ export function CategoriesPage() {
 
     const reordered = arrayMove(categories, oldIndex, newIndex)
     const previous = categories
+    const seq = ++reorderSeqRef.current
     setCategories(reordered) // 楽観更新
     try {
       const fresh = await apiReorderCategories(reordered.map((c) => c.id))
+      // 後続の reorder が先に走っている場合は stale なレスポンスなので無視
+      if (seq !== reorderSeqRef.current) return
       // taskCount を保持しつつサーバの sortOrder を反映
       const countMap = new Map(reordered.map((c) => [c.id, c.taskCount ?? 0]))
       setCategories(fresh.map((c) => ({ ...c, taskCount: countMap.get(c.id) ?? 0 })))
     } catch (e) {
+      if (seq !== reorderSeqRef.current) return
       setCategories(previous) // 失敗時はロールバック
       setError(e instanceof Error ? e.message : String(e))
     }
