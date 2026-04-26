@@ -1,20 +1,142 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { AppHeader } from '../components/AppHeader'
-import type { Category, Task } from '../types'
+import type { Category } from '../types'
 import {
   loadCategories,
-  loadTasks,
   apiCreateCategory,
   apiUpdateCategory,
   apiDeleteCategory,
+  apiReorderCategories,
 } from '../store'
 
 const PROTECTED_NAME = 'その他'
 
+interface RowProps {
+  category: Category
+  isEditing: boolean
+  editingName: string
+  onEditingNameChange: (v: string) => void
+  onStartEdit: () => void
+  onCancelEdit: () => void
+  onSaveEdit: () => void
+  onDelete: () => void
+}
+
+function CategoryRow({
+  category,
+  isEditing,
+  editingName,
+  onEditingNameChange,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
+}: RowProps) {
+  const isProtected = category.name === PROTECTED_NAME
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+    disabled: isEditing,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  }
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="py-3 flex items-center gap-3 bg-white dark:bg-gray-800"
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        disabled={isEditing}
+        className="shrink-0 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-30 touch-none px-1"
+        title="ドラッグで並べ替え"
+        aria-label={`${category.name} を並べ替え`}
+      >
+        ⠿
+      </button>
+
+      {isEditing ? (
+        <input
+          type="text"
+          value={editingName}
+          onChange={(e) => onEditingNameChange(e.target.value)}
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSaveEdit()
+            if (e.key === 'Escape') onCancelEdit()
+          }}
+          className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+        />
+      ) : (
+        <span className="flex-1 text-gray-900 dark:text-gray-100">
+          {category.name}
+          <span className="ml-2 text-xs text-gray-400">{category.taskCount ?? 0}件</span>
+        </span>
+      )}
+      {isEditing ? (
+        <>
+          <button
+            onClick={onSaveEdit}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          >
+            保存
+          </button>
+          <button
+            onClick={onCancelEdit}
+            className="px-3 py-1 text-gray-500 dark:text-gray-400 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            キャンセル
+          </button>
+        </>
+      ) : (
+        <>
+          {!isProtected && (
+            <>
+              <button
+                onClick={onStartEdit}
+                className="px-3 py-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-sm"
+              >
+                編集
+              </button>
+              <button
+                onClick={onDelete}
+                className="px-3 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-sm"
+              >
+                削除
+              </button>
+            </>
+          )}
+          {isProtected && <span className="px-3 py-1 text-xs text-gray-400">既定</span>}
+        </>
+      )}
+    </li>
+  )
+}
+
 export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -24,13 +146,13 @@ export function CategoriesPage() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
   useEffect(() => {
     let cancelled = false
-    Promise.all([loadCategories(), loadTasks()])
-      .then(([cats, ts]) => {
-        if (cancelled) return
-        setCategories(cats)
-        setTasks(ts)
+    loadCategories()
+      .then((cats) => {
+        if (!cancelled) setCategories(cats)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
@@ -42,12 +164,6 @@ export function CategoriesPage() {
       cancelled = true
     }
   }, [])
-
-  const counts = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const t of tasks) map.set(t.category, (map.get(t.category) ?? 0) + 1)
-    return map
-  }, [tasks])
 
   const startEdit = (c: Category) => {
     setEditingId(c.id)
@@ -76,10 +192,9 @@ export function CategoriesPage() {
     }
     try {
       const updated = await apiUpdateCategory(c.id, { name })
-      setCategories((prev) => prev.map((x) => (x.id === c.id ? updated : x)))
-      // tasks.category はサーバ側で updateMany されるため、再取得して整合性を取る
-      const freshTasks = await loadTasks()
-      setTasks(freshTasks)
+      // taskCount はサーバから再取得
+      const fresh = await loadCategories()
+      setCategories(fresh.map((x) => (x.id === c.id ? { ...updated, taskCount: x.taskCount } : x)))
       cancelEdit()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -87,7 +202,7 @@ export function CategoriesPage() {
   }
 
   const deleteCat = async (c: Category) => {
-    const count = counts.get(c.name) ?? 0
+    const count = c.taskCount ?? 0
     const message =
       count > 0
         ? `「${c.name}」を削除します。${count}件のタスクが「${PROTECTED_NAME}」に変更されます。よろしいですか？`
@@ -95,12 +210,9 @@ export function CategoriesPage() {
     if (!confirm(message)) return
     try {
       await apiDeleteCategory(c.id)
-      // 「その他」が新規作成される可能性があるため、サーバから正しい ID で再取得を待つ
+      // 「その他」が新規作成されたり taskCount が増えたりするのでサーバから再取得
       const fresh = await loadCategories()
       setCategories(fresh)
-      setTasks((prev) =>
-        prev.map((t) => (t.category === c.name ? { ...t, category: PROTECTED_NAME } : t)),
-      )
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -118,12 +230,34 @@ export function CategoriesPage() {
     setError('')
     try {
       const created = await apiCreateCategory(name, categories.length)
-      setCategories((prev) => [...prev, created])
+      setCategories((prev) => [...prev, { ...created, taskCount: 0 }])
       setNewName('')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = categories.findIndex((c) => c.id === active.id)
+    const newIndex = categories.findIndex((c) => c.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+
+    const reordered = arrayMove(categories, oldIndex, newIndex)
+    const previous = categories
+    setCategories(reordered) // 楽観更新
+    try {
+      const fresh = await apiReorderCategories(reordered.map((c) => c.id))
+      // taskCount を保持しつつサーバの sortOrder を反映
+      const countMap = new Map(reordered.map((c) => [c.id, c.taskCount ?? 0]))
+      setCategories(fresh.map((c) => ({ ...c, taskCount: countMap.get(c.id) ?? 0 })))
+    } catch (e) {
+      setCategories(previous) // 失敗時はロールバック
+      setError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -142,7 +276,10 @@ export function CategoriesPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">カテゴリ管理</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">カテゴリ管理</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            ⠿ をドラッグして並び順を変更できます
+          </p>
 
           {error && (
             <div className="mb-4 px-3 py-2 rounded bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
@@ -154,76 +291,35 @@ export function CategoriesPage() {
             <p className="text-gray-400 text-sm">読み込み中...</p>
           ) : (
             <>
-              <ul className="divide-y divide-gray-100 dark:divide-gray-700 mb-6">
-                {categories.map((c) => {
-                  const count = counts.get(c.name) ?? 0
-                  const isEditing = editingId === c.id
-                  const isProtected = c.name === PROTECTED_NAME
-                  return (
-                    <li key={c.id} className="py-3 flex items-center gap-3">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveEdit(c)
-                            if (e.key === 'Escape') cancelEdit()
-                          }}
-                          className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
-                        />
-                      ) : (
-                        <span className="flex-1 text-gray-900 dark:text-gray-100">
-                          {c.name}
-                          <span className="ml-2 text-xs text-gray-400">{count}件</span>
-                        </span>
-                      )}
-                      {isEditing ? (
-                        <>
-                          <button
-                            onClick={() => saveEdit(c)}
-                            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                          >
-                            保存
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="px-3 py-1 text-gray-500 dark:text-gray-400 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            キャンセル
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          {!isProtected && (
-                            <>
-                              <button
-                                onClick={() => startEdit(c)}
-                                className="px-3 py-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-sm"
-                              >
-                                編集
-                              </button>
-                              <button
-                                onClick={() => deleteCat(c)}
-                                className="px-3 py-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-sm"
-                              >
-                                削除
-                              </button>
-                            </>
-                          )}
-                          {isProtected && (
-                            <span className="px-3 py-1 text-xs text-gray-400">既定</span>
-                          )}
-                        </>
-                      )}
-                    </li>
-                  )
-                })}
-                {categories.length === 0 && (
-                  <li className="py-3 text-sm text-gray-400">カテゴリがありません</li>
-                )}
-              </ul>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={categories.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <ul className="divide-y divide-gray-100 dark:divide-gray-700 mb-6">
+                    {categories.map((c) => (
+                      <CategoryRow
+                        key={c.id}
+                        category={c}
+                        isEditing={editingId === c.id}
+                        editingName={editingName}
+                        onEditingNameChange={setEditingName}
+                        onStartEdit={() => startEdit(c)}
+                        onCancelEdit={cancelEdit}
+                        onSaveEdit={() => saveEdit(c)}
+                        onDelete={() => deleteCat(c)}
+                      />
+                    ))}
+                    {categories.length === 0 && (
+                      <li className="py-3 text-sm text-gray-400">カテゴリがありません</li>
+                    )}
+                  </ul>
+                </SortableContext>
+              </DndContext>
 
               <form onSubmit={handleCreate} className="flex gap-2">
                 <input

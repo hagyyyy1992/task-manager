@@ -101,6 +101,16 @@ export async function apiDeleteCategory(id: string): Promise<void> {
   if (!res.ok) throw new Error(await readError(res, 'Failed to delete category'))
 }
 
+export async function apiReorderCategories(ids: string[]): Promise<Category[]> {
+  const res = await fetch(`${CATEGORIES_API}/reorder`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ ids }),
+  })
+  if (!res.ok) throw new Error(await readError(res, 'Failed to reorder categories'))
+  return await res.json()
+}
+
 export function generateId(): string {
   return crypto.randomUUID()
 }

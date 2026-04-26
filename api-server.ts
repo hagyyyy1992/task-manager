@@ -10,11 +10,15 @@ import {
   createUser,
   updateUserPassword,
   deleteUser,
-  loadCategories,
+  loadCategoriesWithCounts,
   createCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
   seedDefaultCategories,
+  CategoryProtectedError,
+  CategoryDuplicateError,
+  CategoryReorderError,
 } from './db.js'
 import type { Task } from './db.js'
 import { hashPassword, verifyPassword, createToken, verifyToken } from './auth.js'
@@ -220,7 +224,7 @@ const server = createServer(async (req, res) => {
 
     // GET /api/categories
     if (url === '/api/categories' && req.method === 'GET') {
-      const categories = await loadCategories(userId)
+      const categories = await loadCategoriesWithCounts(userId)
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(categories))
       return
@@ -240,33 +244,80 @@ const server = createServer(async (req, res) => {
       return
     }
 
+    // PATCH /api/categories/reorder  (must come before /api/categories/:id)
+    if (url === '/api/categories/reorder' && req.method === 'PATCH') {
+      const body = await readBody(req)
+      const parsed = JSON.parse(body) as { ids?: unknown }
+      if (!Array.isArray(parsed.ids) || !parsed.ids.every((x) => typeof x === 'string')) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'ids must be string[]' }))
+        return
+      }
+      try {
+        const updated = await reorderCategories(userId, parsed.ids as string[])
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(updated))
+      } catch (e: unknown) {
+        if (e instanceof CategoryReorderError) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: e.message }))
+          return
+        }
+        throw e
+      }
+      return
+    }
+
     // PATCH /api/categories/:id
     const categoryPatchMatch = url.match(/^\/api\/categories\/(.+)$/)
     if (categoryPatchMatch && req.method === 'PATCH') {
       const body = await readBody(req)
       const updates = JSON.parse(body)
-      const updated = await updateCategory(categoryPatchMatch[1], updates, userId)
-      if (!updated) {
-        res.writeHead(404, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ error: 'not found' }))
-        return
+      try {
+        const updated = await updateCategory(categoryPatchMatch[1], updates, userId)
+        if (!updated) {
+          res.writeHead(404, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'not found' }))
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(updated))
+      } catch (e: unknown) {
+        if (e instanceof CategoryProtectedError) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: e.message }))
+          return
+        }
+        if (e instanceof CategoryDuplicateError) {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: '同じ名前のカテゴリが既に存在します' }))
+          return
+        }
+        throw e
       }
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify(updated))
       return
     }
 
     // DELETE /api/categories/:id
     const categoryDeleteMatch = url.match(/^\/api\/categories\/(.+)$/)
     if (categoryDeleteMatch && req.method === 'DELETE') {
-      const deleted = await deleteCategory(categoryDeleteMatch[1], userId)
-      if (!deleted) {
-        res.writeHead(404, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ error: 'not found' }))
-        return
+      try {
+        const deleted = await deleteCategory(categoryDeleteMatch[1], userId)
+        if (!deleted) {
+          res.writeHead(404, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'not found' }))
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ message: 'deleted' }))
+      } catch (e: unknown) {
+        if (e instanceof CategoryProtectedError) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: e.message }))
+          return
+        }
+        throw e
       }
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ message: 'deleted' }))
       return
     }
 

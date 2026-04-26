@@ -267,6 +267,29 @@ export async function loadCategories(userId: string): Promise<Category[]> {
   return rows.map(dbCategoryToCategory)
 }
 
+export interface CategoryWithCount extends Category {
+  taskCount: number
+}
+
+export async function loadCategoriesWithCounts(userId: string): Promise<CategoryWithCount[]> {
+  const [rows, counts] = await Promise.all([
+    prisma.category.findMany({
+      where: { userId },
+      orderBy: { sortOrder: 'asc' },
+    }),
+    prisma.task.groupBy({
+      by: ['category'],
+      where: { userId },
+      _count: { _all: true },
+    }),
+  ])
+  const countMap = new Map(counts.map((c) => [c.category, c._count._all]))
+  return rows.map((row) => ({
+    ...dbCategoryToCategory(row),
+    taskCount: countMap.get(row.name) ?? 0,
+  }))
+}
+
 export async function createCategory(
   userId: string,
   name: string,
@@ -293,6 +316,31 @@ export class CategoryDuplicateError extends Error {
     super(message)
     this.name = 'CategoryDuplicateError'
   }
+}
+
+export class CategoryReorderError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CategoryReorderError'
+  }
+}
+
+export async function reorderCategories(userId: string, orderedIds: string[]): Promise<Category[]> {
+  const existing = await prisma.category.findMany({ where: { userId } })
+  if (orderedIds.length !== existing.length) {
+    throw new CategoryReorderError('全カテゴリのIDを過不足なく指定してください')
+  }
+  const ownedIds = new Set(existing.map((c) => c.id))
+  const seen = new Set<string>()
+  for (const id of orderedIds) {
+    if (!ownedIds.has(id)) throw new CategoryReorderError('不正なカテゴリIDが含まれています')
+    if (seen.has(id)) throw new CategoryReorderError('重複したカテゴリIDが含まれています')
+    seen.add(id)
+  }
+  await prisma.$transaction(
+    orderedIds.map((id, i) => prisma.category.update({ where: { id }, data: { sortOrder: i } })),
+  )
+  return loadCategories(userId)
 }
 
 export async function updateCategory(
