@@ -15,6 +15,7 @@ import {
   deleteCategory,
   seedDefaultCategories,
   CategoryProtectedError,
+  CategoryDuplicateError,
 } from './db.js'
 import type { Task } from './db.js'
 import { hashPassword, verifyPassword, createToken, verifyToken } from './auth.js'
@@ -300,7 +301,7 @@ export const handler = async (event: LambdaEvent) => {
         if (e instanceof CategoryProtectedError) {
           return { statusCode: 400, headers, body: JSON.stringify({ error: e.message }) }
         }
-        if (isPrismaUniqueViolationOnName(e)) {
+        if (e instanceof CategoryDuplicateError || isPrismaUniqueViolationOnName(e)) {
           return {
             statusCode: 409,
             headers,

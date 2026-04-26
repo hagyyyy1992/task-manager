@@ -8,6 +8,12 @@ vi.mock('./db.js', () => {
       this.name = 'CategoryProtectedError'
     }
   }
+  class CategoryDuplicateError extends Error {
+    constructor(message = '同じ名前のカテゴリが既に存在します') {
+      super(message)
+      this.name = 'CategoryDuplicateError'
+    }
+  }
   return {
     loadTasks: vi.fn(),
     createTask: vi.fn(),
@@ -24,6 +30,7 @@ vi.mock('./db.js', () => {
     deleteCategory: vi.fn(),
     seedDefaultCategories: vi.fn(),
     CategoryProtectedError,
+    CategoryDuplicateError,
   }
 })
 
@@ -50,6 +57,7 @@ import {
   deleteCategory,
   seedDefaultCategories,
   CategoryProtectedError,
+  CategoryDuplicateError,
 } from './db.js'
 import { verifyPassword, verifyToken } from './auth.js'
 import { handler } from './handler.js'
@@ -805,6 +813,13 @@ describe('PATCH /api/categories/:id (重複名)', () => {
     const res = await handler(event('PATCH', '/api/categories/cat123', { sortOrder: -1 }))
     expect(res.statusCode).toBe(400)
     expect(updateCategory).not.toHaveBeenCalled()
+  })
+
+  it('CategoryDuplicateError は 409 を返す', async () => {
+    vi.mocked(updateCategory).mockRejectedValue(new CategoryDuplicateError())
+    const res = await handler(event('PATCH', '/api/categories/cat123', { name: '既存名' }))
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).error).toContain('既に存在')
   })
 
   it('「その他」のリネームは400を返す', async () => {

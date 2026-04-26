@@ -288,6 +288,13 @@ export class CategoryProtectedError extends Error {
   }
 }
 
+export class CategoryDuplicateError extends Error {
+  constructor(message = '同じ名前のカテゴリが既に存在します') {
+    super(message)
+    this.name = 'CategoryDuplicateError'
+  }
+}
+
 export async function updateCategory(
   id: string,
   updates: { name?: string; sortOrder?: number },
@@ -310,6 +317,10 @@ export async function updateCategory(
 
   const updated = await prisma.$transaction(async (tx) => {
     if (renaming) {
+      const dup = await tx.category.findFirst({
+        where: { userId, name: newName, NOT: { id } },
+      })
+      if (dup) throw new CategoryDuplicateError()
       await tx.task.updateMany({
         where: { userId, category: oldName },
         data: { category: newName },
