@@ -83,7 +83,7 @@ export async function createTask(task: Task, userId: string): Promise<void> {
       title: task.title,
       status: task.status,
       priority: task.priority,
-      category: task.category,
+      category: task.category.trim(),
       dueDate: task.dueDate ? new Date(task.dueDate + 'T00:00:00Z') : null,
       memo: task.memo,
       userId,
@@ -107,7 +107,7 @@ export async function updateTask(
   if (updates.status !== undefined) data.status = updates.status
   if (updates.priority !== undefined) data.priority = updates.priority
   if (updates.memo !== undefined) data.memo = updates.memo
-  if (updates.category !== undefined) data.category = updates.category
+  if (updates.category !== undefined) data.category = updates.category.trim()
   if (updates.dueDate !== undefined) {
     data.dueDate = updates.dueDate ? new Date(updates.dueDate + 'T00:00:00Z') : null
   }
