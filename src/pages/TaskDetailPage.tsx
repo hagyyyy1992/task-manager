@@ -97,6 +97,7 @@ export function TaskDetailPage() {
       memo,
       updatedAt: now,
     }
+    const original = task
     setTask(updated)
     setCategory(finalCategory)
     setShowNewCategory(false)
@@ -113,6 +114,17 @@ export function TaskDetailPage() {
       })
     } catch (e) {
       console.error(e)
+      const msg = e instanceof Error ? e.message : String(e)
+      alert(`保存に失敗しました: ${msg}`)
+      // UI を保存前の状態に戻す
+      setTask(original)
+      setTitle(original.title)
+      setStatus(original.status)
+      setPriority(original.priority)
+      setCategory(original.category)
+      setDueDate(original.dueDate ?? '')
+      setMemo(original.memo)
+      setEditing(true)
     }
   }
 
