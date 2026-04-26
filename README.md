@@ -4,6 +4,15 @@
 React フロントエンド + Node.js API サーバーの2層構成。<br>
 Neon PostgreSQL をバックエンドに使用することで複数端末間でタスクを同期できる。
 
+アプリURL:
+https://d3pi0juuilndgb.cloudfront.net
+
+### デモアカウント
+
+| メール           | パスワード   |
+| ---------------- | ------------ |
+| demo@example.com | password1234 |
+
 ## 構成
 
 ```
