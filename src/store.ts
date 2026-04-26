@@ -65,8 +65,15 @@ export async function apiCreateCategory(name: string, sortOrder?: number): Promi
 
 async function readError(res: Response, fallback: string): Promise<string> {
   try {
-    const body = (await res.json()) as { error?: string }
-    if (body.error) return body.error
+    const body: unknown = await res.json()
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'error' in body &&
+      typeof (body as { error: unknown }).error === 'string'
+    ) {
+      return (body as { error: string }).error
+    }
   } catch {
     // ignore
   }
