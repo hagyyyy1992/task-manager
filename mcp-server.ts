@@ -2,7 +2,15 @@ import { randomUUID } from 'crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { loadTasks, createTask, updateTask, deleteTask, loadCategories, type Task } from './db.js'
+import {
+  loadTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+  loadCategories,
+  findUserById,
+  type Task,
+} from './db.js'
 import { verifyToken } from './auth.js'
 
 const token = process.env.TASK_APP_TOKEN
@@ -15,10 +23,38 @@ if (!userId) {
   throw new Error('TASK_APP_TOKEN is invalid or expired')
 }
 
-const server = new McpServer({
-  name: 'task-app',
-  version: '2.0.0',
-})
+const currentUser = await findUserById(userId)
+if (!currentUser) {
+  throw new Error('TASK_APP_TOKEN のユーザーが DB に存在しません')
+}
+
+const server = new McpServer(
+  {
+    name: 'task-app',
+    version: '2.1.0',
+  },
+  {
+    instructions: `接続中アカウント: ${currentUser.email} (userId: ${currentUser.id})
+全ツールはこのユーザーのデータに対してのみ実行されます。
+別アカウントを操作したい場合は、TASK_APP_TOKEN を切り替えて MCP サーバーを再起動してください。`,
+  },
+)
+
+server.tool(
+  'whoami',
+  '現在の MCP 接続が紐づいているアカウント情報を返す。破壊的操作の前に確認用',
+  {},
+  async () => {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `email: ${currentUser.email}\nuserId: ${currentUser.id}\nname: ${currentUser.name}`,
+        },
+      ],
+    }
+  },
+)
 
 server.tool(
   'list_tasks',
@@ -124,11 +160,31 @@ server.tool(
 
 server.tool(
   'delete_task',
-  'タスクを削除',
+  'タスクを削除。安全のため expectedTitle に削除対象のタイトルを正確に渡す必要がある',
   {
     id: z.string().describe('タスクID'),
+    expectedTitle: z
+      .string()
+      .describe('削除対象タスクのタイトル。実際のタイトルと一致しない場合は削除されない'),
   },
-  async ({ id }) => {
+  async ({ id, expectedTitle }) => {
+    const tasks = await loadTasks({ userId })
+    const target = tasks.find((t) => t.id === id)
+    if (!target) {
+      return {
+        content: [{ type: 'text', text: `タスクが見つかりません: ${id}` }],
+      }
+    }
+    if (target.title !== expectedTitle) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `タイトル不一致のため削除を中止しました。実際のタイトル: "${target.title}" / 指定: "${expectedTitle}"`,
+          },
+        ],
+      }
+    }
     const deleted = await deleteTask(id, userId)
     if (!deleted) {
       return {
