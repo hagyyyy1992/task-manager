@@ -272,7 +272,9 @@ export interface CategoryWithCount extends Category {
 }
 
 export async function loadCategoriesWithCounts(userId: string): Promise<CategoryWithCount[]> {
-  const [rows, counts] = await Promise.all([
+  // 同一トランザクション内で読むことで、間に rename/delete が割り込んで
+  // categories.name と tasks.category の対応が崩れた状態を観測しないようにする
+  const [rows, counts] = await prisma.$transaction([
     prisma.category.findMany({
       where: { userId },
       orderBy: { sortOrder: 'asc' },
@@ -326,21 +328,27 @@ export class CategoryReorderError extends Error {
 }
 
 export async function reorderCategories(userId: string, orderedIds: string[]): Promise<Category[]> {
-  const existing = await prisma.category.findMany({ where: { userId } })
-  if (orderedIds.length !== existing.length) {
-    throw new CategoryReorderError('全カテゴリのIDを過不足なく指定してください')
-  }
-  const ownedIds = new Set(existing.map((c) => c.id))
-  const seen = new Set<string>()
-  for (const id of orderedIds) {
-    if (!ownedIds.has(id)) throw new CategoryReorderError('不正なカテゴリIDが含まれています')
-    if (seen.has(id)) throw new CategoryReorderError('重複したカテゴリIDが含まれています')
-    seen.add(id)
-  }
-  await prisma.$transaction(
-    orderedIds.map((id, i) => prisma.category.update({ where: { id }, data: { sortOrder: i } })),
-  )
-  return loadCategories(userId)
+  // 検証と更新を同一トランザクション内に閉じ込めることで、
+  // 別リクエストのカテゴリ追加・削除と競合した古い集合で sortOrder を上書きしないようにする
+  return prisma
+    .$transaction(async (tx) => {
+      const existing = await tx.category.findMany({ where: { userId } })
+      if (orderedIds.length !== existing.length) {
+        throw new CategoryReorderError('全カテゴリのIDを過不足なく指定してください')
+      }
+      const ownedIds = new Set(existing.map((c) => c.id))
+      const seen = new Set<string>()
+      for (const id of orderedIds) {
+        if (!ownedIds.has(id)) throw new CategoryReorderError('不正なカテゴリIDが含まれています')
+        if (seen.has(id)) throw new CategoryReorderError('重複したカテゴリIDが含まれています')
+        seen.add(id)
+      }
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.category.update({ where: { id: orderedIds[i] }, data: { sortOrder: i } })
+      }
+      return tx.category.findMany({ where: { userId }, orderBy: { sortOrder: 'asc' } })
+    })
+    .then((rows) => rows.map(dbCategoryToCategory))
 }
 
 export async function updateCategory(
