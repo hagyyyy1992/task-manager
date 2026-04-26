@@ -104,7 +104,7 @@ export function TaskDetailPage() {
     setNewCategoryInput('')
     setEditing(false)
     try {
-      await apiUpdateTask(task.id, {
+      const saved = await apiUpdateTask(task.id, {
         title: updated.title,
         status: updated.status,
         priority: updated.priority,
@@ -112,6 +112,9 @@ export function TaskDetailPage() {
         memo: updated.memo,
         dueDate: updated.dueDate,
       })
+      // サーバ側で trim 等の正規化が入る可能性があるので、レスポンスで上書き
+      setTask(saved)
+      setCategory(saved.category)
     } catch (e) {
       console.error(e)
       const msg = e instanceof Error ? e.message : String(e)
