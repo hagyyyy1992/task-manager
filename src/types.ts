@@ -7,6 +7,7 @@ export interface Category {
   name: string
   sortOrder: number
   createdAt: string
+  taskCount?: number
 }
 
 export interface Task {

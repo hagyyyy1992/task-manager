@@ -14,6 +14,12 @@ vi.mock('./db.js', () => {
       this.name = 'CategoryDuplicateError'
     }
   }
+  class CategoryReorderError extends Error {
+    constructor(message: string) {
+      super(message)
+      this.name = 'CategoryReorderError'
+    }
+  }
   return {
     loadTasks: vi.fn(),
     createTask: vi.fn(),
@@ -24,13 +30,15 @@ vi.mock('./db.js', () => {
     createUser: vi.fn(),
     updateUserPassword: vi.fn(),
     deleteUser: vi.fn(),
-    loadCategories: vi.fn(),
+    loadCategoriesWithCounts: vi.fn(),
     createCategory: vi.fn(),
     updateCategory: vi.fn(),
     deleteCategory: vi.fn(),
+    reorderCategories: vi.fn(),
     seedDefaultCategories: vi.fn(),
     CategoryProtectedError,
     CategoryDuplicateError,
+    CategoryReorderError,
   }
 })
 
@@ -51,13 +59,15 @@ import {
   createUser,
   updateUserPassword,
   deleteUser,
-  loadCategories,
+  loadCategoriesWithCounts,
   createCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
   seedDefaultCategories,
   CategoryProtectedError,
   CategoryDuplicateError,
+  CategoryReorderError,
 } from './db.js'
 import { verifyPassword, verifyToken } from './auth.js'
 import { handler } from './handler.js'
@@ -665,12 +675,13 @@ const mockCategory = {
 }
 
 describe('GET /api/categories', () => {
-  it('returns category list for authenticated user', async () => {
-    vi.mocked(loadCategories).mockResolvedValue([mockCategory])
+  it('returns category list with taskCount for authenticated user', async () => {
+    const withCount = { ...mockCategory, taskCount: 3 }
+    vi.mocked(loadCategoriesWithCounts).mockResolvedValue([withCount])
     const res = await handler(event('GET', '/api/categories'))
     expect(res.statusCode).toBe(200)
-    expect(loadCategories).toHaveBeenCalledWith('user123')
-    expect(JSON.parse(res.body)).toEqual([mockCategory])
+    expect(loadCategoriesWithCounts).toHaveBeenCalledWith('user123')
+    expect(JSON.parse(res.body)).toEqual([withCount])
   })
 
   it('returns 401 without authentication', async () => {
@@ -829,5 +840,46 @@ describe('PATCH /api/categories/:id (重複名)', () => {
     const res = await handler(event('PATCH', '/api/categories/cat-sonota', { name: 'ゴミ箱' }))
     expect(res.statusCode).toBe(400)
     expect(JSON.parse(res.body).error).toContain('その他')
+  })
+})
+
+describe('PATCH /api/categories/reorder', () => {
+  it('並び替えに成功すると200と更新後一覧を返す', async () => {
+    const reordered = [
+      { ...mockCategory, id: 'b', sortOrder: 0 },
+      { ...mockCategory, id: 'a', sortOrder: 1 },
+    ]
+    vi.mocked(reorderCategories).mockResolvedValue(reordered)
+    const res = await handler(event('PATCH', '/api/categories/reorder', { ids: ['b', 'a'] }))
+    expect(res.statusCode).toBe(200)
+    expect(reorderCategories).toHaveBeenCalledWith('user123', ['b', 'a'])
+    expect(JSON.parse(res.body)).toEqual(reordered)
+    expect(updateCategory).not.toHaveBeenCalled()
+  })
+
+  it('ids が配列でない場合は400', async () => {
+    const res = await handler(event('PATCH', '/api/categories/reorder', { ids: 'not-array' }))
+    expect(res.statusCode).toBe(400)
+    expect(reorderCategories).not.toHaveBeenCalled()
+  })
+
+  it('ids に文字列以外が混ざっていれば400', async () => {
+    const res = await handler(event('PATCH', '/api/categories/reorder', { ids: ['a', 1] }))
+    expect(res.statusCode).toBe(400)
+    expect(reorderCategories).not.toHaveBeenCalled()
+  })
+
+  it('CategoryReorderError は400を返す', async () => {
+    vi.mocked(reorderCategories).mockRejectedValue(
+      new CategoryReorderError('全カテゴリのIDを過不足なく指定してください'),
+    )
+    const res = await handler(event('PATCH', '/api/categories/reorder', { ids: ['a'] }))
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('過不足')
+  })
+
+  it('returns 401 without authentication', async () => {
+    const res = await handler(event('PATCH', '/api/categories/reorder', { ids: ['a'] }, false))
+    expect(res.statusCode).toBe(401)
   })
 })

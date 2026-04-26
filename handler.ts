@@ -9,13 +9,15 @@ import {
   createUser,
   updateUserPassword,
   deleteUser,
-  loadCategories,
+  loadCategoriesWithCounts,
   createCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
   seedDefaultCategories,
   CategoryProtectedError,
   CategoryDuplicateError,
+  CategoryReorderError,
 } from './db.js'
 import type { Task } from './db.js'
 import { hashPassword, verifyPassword, createToken, verifyToken } from './auth.js'
@@ -262,8 +264,29 @@ export const handler = async (event: LambdaEvent) => {
 
     // GET /api/categories
     if (path === '/api/categories' && method === 'GET') {
-      const categories = await loadCategories(userId)
+      const categories = await loadCategoriesWithCounts(userId)
       return { statusCode: 200, headers, body: JSON.stringify(categories) }
+    }
+
+    // PATCH /api/categories/reorder  (must come before /api/categories/:id)
+    if (path === '/api/categories/reorder' && method === 'PATCH') {
+      const body = parseBody(event) as { ids?: unknown }
+      if (!Array.isArray(body.ids) || !body.ids.every((x) => typeof x === 'string')) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'ids must be string[]' }),
+        }
+      }
+      try {
+        const updated = await reorderCategories(userId, body.ids as string[])
+        return { statusCode: 200, headers, body: JSON.stringify(updated) }
+      } catch (e: unknown) {
+        if (e instanceof CategoryReorderError) {
+          return { statusCode: 400, headers, body: JSON.stringify({ error: e.message }) }
+        }
+        throw e
+      }
     }
 
     // POST /api/categories
