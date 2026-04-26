@@ -341,19 +341,16 @@ export async function deleteCategory(id: string, userId: string): Promise<boolea
   }
 
   await prisma.$transaction(async (tx) => {
-    const fallback = await tx.category.findFirst({
-      where: { userId, name: FALLBACK_CATEGORY_NAME },
+    const max = await tx.category.aggregate({
+      where: { userId },
+      _max: { sortOrder: true },
     })
-    if (!fallback) {
-      const max = await tx.category.aggregate({
-        where: { userId },
-        _max: { sortOrder: true },
-      })
-      const nextOrder = (max._max.sortOrder ?? -1) + 1
-      await tx.category.create({
-        data: { userId, name: FALLBACK_CATEGORY_NAME, sortOrder: nextOrder },
-      })
-    }
+    const nextOrder = (max._max.sortOrder ?? -1) + 1
+    await tx.category.upsert({
+      where: { userId_name: { userId, name: FALLBACK_CATEGORY_NAME } },
+      create: { userId, name: FALLBACK_CATEGORY_NAME, sortOrder: nextOrder },
+      update: {},
+    })
     await tx.task.updateMany({
       where: { userId, category: existing.name },
       data: { category: FALLBACK_CATEGORY_NAME },
