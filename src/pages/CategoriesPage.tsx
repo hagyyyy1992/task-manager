@@ -93,29 +93,12 @@ export function CategoriesPage() {
     if (!confirm(message)) return
     try {
       await apiDeleteCategory(c.id)
-      setCategories((prev) => {
-        const remaining = prev.filter((x) => x.id !== c.id)
-        if (count > 0 && !remaining.find((x) => x.name === PROTECTED_NAME)) {
-          return [
-            ...remaining,
-            {
-              id: `local-${PROTECTED_NAME}`,
-              userId: c.userId,
-              name: PROTECTED_NAME,
-              sortOrder: remaining.length,
-              createdAt: new Date().toISOString(),
-            },
-          ]
-        }
-        return remaining
-      })
+      // 「その他」が新規作成される可能性があるため、サーバから正しい ID で再取得を待つ
+      const fresh = await loadCategories()
+      setCategories(fresh)
       setTasks((prev) =>
         prev.map((t) => (t.category === c.name ? { ...t, category: PROTECTED_NAME } : t)),
       )
-      // 「その他」が新規作成されている可能性があるのでマスタを再取得
-      if (count > 0) {
-        loadCategories().then(setCategories).catch(console.error)
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
