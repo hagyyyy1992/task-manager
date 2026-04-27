@@ -190,6 +190,44 @@ describe('auth middleware', () => {
     expect((await res.json()).error).toMatch(/JSON/i)
   })
 
+  it('POST with no body → 400 (request body is required)', async () => {
+    const app = (await import('@api/framework/app.js')).buildApp({ container })
+    const res = await app.fetch(new Request('http://localhost/api/auth/login', { method: 'POST' }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/body is required/i)
+  })
+
+  it('PATCH with no body → 400 (controller does not 500 on missing body)', async () => {
+    vi.mocked(container.tokens.verify).mockResolvedValue({ userId: 'user123', scope: 'session' })
+    const app = (await import('@api/framework/app.js')).buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/tasks/abc', {
+        method: 'PATCH',
+        headers: { authorization: 'Bearer test-token' },
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/body is required/i)
+  })
+
+  it('DELETE /api/auth/account with no body → 400 invalid_input (not 500)', async () => {
+    vi.mocked(container.tokens.verify).mockResolvedValue({ userId: 'user123', scope: 'session' })
+    vi.mocked(container.deleteAccount.execute).mockResolvedValue({
+      ok: false,
+      reason: 'invalid_input',
+      message: 'currentPassword is required',
+    })
+    const app = (await import('@api/framework/app.js')).buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/auth/account', {
+        method: 'DELETE',
+        headers: { authorization: 'Bearer test-token' },
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/currentPassword/)
+  })
+
   it('returns 401 when token is invalid', async () => {
     vi.mocked(container.tokens.verify).mockResolvedValue(null)
     const res = await req('/api/tasks')

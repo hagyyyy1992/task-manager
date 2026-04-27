@@ -64,7 +64,14 @@ export function createAuthController(container: Container) {
   })
 
   protectedRoutes.delete('/account', async (c) => {
-    const body = await c.req.json<{ currentPassword?: string }>()
+    // DELETE は body オプション (json-body middleware は body 不在を素通り)。
+    // body 無しなら currentPassword 未指定として interactor 側の 400 invalid_input に流す。
+    let body: { currentPassword?: string } = {}
+    try {
+      body = await c.req.json<{ currentPassword?: string }>()
+    } catch {
+      // 空 body / 壊れた JSON は middleware で 400 済み or body 不在で空オブジェクト扱い
+    }
     const result = await container.deleteAccount.execute({
       userId: c.get('userId'),
       currentPassword: body.currentPassword ?? '',
