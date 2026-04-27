@@ -18,6 +18,8 @@ export default defineConfig({
         'src/test-setup.ts',
         'src/main.tsx',
         'src/vite-env.d.ts',
+        // 型のみのファイル（実行コードなし）。v8 が 0/0 を 0% と表示するため除外。
+        'src/types.ts',
         '**/*.test.{ts,tsx}',
         // api-server.ts は handler.ts と同等ロジックのローカル開発用 HTTP サーバ。
         // モジュール先頭で server.listen を呼ぶ構造のため単体テストが困難。
