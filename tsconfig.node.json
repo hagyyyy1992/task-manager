@@ -19,5 +19,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "mcp-server.ts", "issue-token.ts", "migrate.ts"]
+  "include": ["vite.config.ts", "mcp-server.ts", "issue-token.ts", "prisma.config.ts"]
 }
