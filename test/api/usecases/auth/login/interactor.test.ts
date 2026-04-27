@@ -39,6 +39,11 @@ beforeEach(() => {
 })
 
 describe('LoginInteractor', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
   it('成功時は user/token を返し、passwordHash は除外する', async () => {
     const result = await interactor.execute({ email: 'test@example.com', password: 'pw' })
     expect(result.ok).toBe(true)
@@ -69,5 +74,25 @@ describe('LoginInteractor', () => {
     const result = await interactor.execute({ email: 'x@y.com', password: 'wrong' })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('invalid_credentials')
+  })
+
+  it('失敗時は emailFp と userExists を warn ログ出力する（生 email は出さない）', async () => {
+    const warn = vi.mocked(console.warn)
+    passwords.verify = vi.fn().mockResolvedValue(false)
+    await interactor.execute({ email: 'logged@example.com', password: 'wrong' })
+    const call = warn.mock.calls.find((c) => c[0] === 'auth.login.failed')
+    expect(call).toBeDefined()
+    const meta = call?.[1] as { emailFp: string; userExists: boolean }
+    expect(meta.emailFp).toMatch(/^[0-9a-f]{16}$/)
+    expect(meta.userExists).toBe(true)
+    expect(JSON.stringify(call)).not.toContain('logged@example.com')
+  })
+
+  it('成功時は userId のみ info ログ出力（email は含めない）', async () => {
+    const info = vi.mocked(console.info)
+    await interactor.execute({ email: 'test@example.com', password: 'pw' })
+    const call = info.mock.calls.find((c) => c[0] === 'auth.login.success')
+    expect(call).toBeDefined()
+    expect(JSON.stringify(call)).not.toContain('test@example.com')
   })
 })
