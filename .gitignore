@@ -11,5 +11,5 @@ terraform/terraform.tfstate.*.backup
 terraform/.terraform.tfstate.lock.info
 terraform/.lambda-build/
 
-/src/generated/prisma
+/api/src/generated/prisma
 coverage/

@@ -40,7 +40,7 @@ export default defineConfig({
         'api/src/framework/**/*.ts',
       ],
       exclude: [
-        'front/src/generated/**',
+        'api/src/generated/**',
         'front/src/**/*.d.ts',
         'front/src/test-setup.ts',
         'front/src/main.tsx',
