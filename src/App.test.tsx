@@ -221,12 +221,30 @@ describe('App (タスク一覧)', () => {
     expect(screen.getByText('フィルタに一致するタスクがありません')).toBeInTheDocument()
   })
 
-  it('TaskForm 内の onCategoryCreated でカテゴリが追加される', async () => {
-    // 統合的に確認するのは難しいため、追加ボタン → 作成フローを確認するに留める
+  it('TaskForm 内の「+ 新規」で apiCreateCategory → onCategoryCreated が呼ばれ、カテゴリ select に反映', async () => {
+    const { apiCreateCategory } = await import('./store')
+    vi.mocked(apiCreateCategory).mockResolvedValue({
+      id: 'c-new',
+      userId: 'u1',
+      name: '新カテゴリ',
+      sortOrder: 3,
+      createdAt: '',
+    })
+    vi.mocked(apiCreateTask).mockResolvedValue()
+
     renderApp()
     await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
+
     fireEvent.click(screen.getByText('+ 追加'))
-    expect(screen.getByText('タスク追加')).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('タスク名'), { target: { value: 'X' } })
+    fireEvent.click(screen.getByTitle('新規カテゴリ'))
+    fireEvent.change(screen.getByPlaceholderText('新しいカテゴリ名'), {
+      target: { value: '新カテゴリ' },
+    })
+    fireEvent.click(screen.getByText('追加'))
+
+    await waitFor(() => expect(apiCreateCategory).toHaveBeenCalledWith('新カテゴリ', 3))
+    await waitFor(() => expect(apiCreateTask).toHaveBeenCalled())
   })
 })
 

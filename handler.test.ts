@@ -643,6 +643,21 @@ describe('PATCH /api/auth/password', () => {
     expect(res.statusCode).toBe(401)
     expect(JSON.parse(res.body).error).toContain('current password')
   })
+
+  it('returns 404 when findUserByEmail returns null（findUserById は通過したが email から引けない）', async () => {
+    vi.mocked(findUserById).mockResolvedValue(mockUser)
+    vi.mocked(findUserByEmail).mockResolvedValue(null)
+
+    const res = await handler(
+      event('PATCH', '/api/auth/password', {
+        currentPassword: 'password1234',
+        newPassword: 'newpassword5678',
+      }),
+    )
+
+    expect(res.statusCode).toBe(404)
+    expect(JSON.parse(res.body).error).toContain('user not found')
+  })
 })
 
 // ─── アカウント削除テスト ────────────────────────────────────────

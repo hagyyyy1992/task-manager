@@ -97,6 +97,12 @@ describe('TaskItem', () => {
     expect(screen.getByTestId('detail')).toBeInTheDocument()
   })
 
+  it('タイトル領域クリックでも /task/:id に遷移する', () => {
+    render(wrap(baseTask))
+    fireEvent.click(screen.getByText('タスク'))
+    expect(screen.getByTestId('detail')).toBeInTheDocument()
+  })
+
   it('isDraggable=true でドラッグハンドルを表示する', () => {
     render(wrap(baseTask, { isDraggable: true }))
     expect(screen.getByTitle('ドラッグで並べ替え')).toBeInTheDocument()

@@ -102,6 +102,16 @@ describe('AccountPage', () => {
     await waitFor(() => expect(screen.getByText('現在のパスワードが違います')).toBeInTheDocument())
   })
 
+  it('Error 以外の rejection は "Failed" にフォールバックする', async () => {
+    vi.mocked(changePassword).mockRejectedValue('plain-string')
+    renderPage()
+    const pwInputs = document.querySelectorAll('input[type="password"]')
+    fireEvent.change(pwInputs[0], { target: { value: 'oldpassword' } })
+    fireEvent.change(pwInputs[1], { target: { value: 'newpassword' } })
+    fireEvent.click(screen.getByRole('button', { name: /パスワードを変更/ }))
+    await waitFor(() => expect(screen.getByText('Failed')).toBeInTheDocument())
+  })
+
   it('削除ボタンを2回押すと deleteAccount が呼ばれ /login へ遷移', async () => {
     deleteAccountMock.mockResolvedValue(undefined)
     renderPage()

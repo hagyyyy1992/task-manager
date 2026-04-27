@@ -125,6 +125,48 @@ describe('TaskForm (新規作成)', () => {
     expect(select).toBeTruthy()
   })
 
+  it('ステータス select 変更後 submit すると Task.status に反映される', () => {
+    const onAdd = vi.fn()
+    render(<TaskForm onAdd={onAdd} onClose={vi.fn()} categories={cats} />)
+    fireEvent.change(screen.getByPlaceholderText('タスク名'), { target: { value: 'T' } })
+    const statusSelect = screen
+      .getAllByRole('combobox')
+      .find((el) =>
+        Array.from((el as HTMLSelectElement).options).some((o) => o.value === 'in_progress'),
+      ) as HTMLSelectElement
+    fireEvent.change(statusSelect, { target: { value: 'in_progress' } })
+    fireEvent.click(screen.getByText('追加'))
+    expect((onAdd.mock.calls[0][0] as Task).status).toBe('in_progress')
+  })
+
+  it('優先度 select 変更後 submit すると Task.priority に反映される', () => {
+    const onAdd = vi.fn()
+    render(<TaskForm onAdd={onAdd} onClose={vi.fn()} categories={cats} />)
+    fireEvent.change(screen.getByPlaceholderText('タスク名'), { target: { value: 'T' } })
+    const prioritySelect = screen
+      .getAllByRole('combobox')
+      .find((el) =>
+        Array.from((el as HTMLSelectElement).options).some((o) => o.value === 'high'),
+      ) as HTMLSelectElement
+    fireEvent.change(prioritySelect, { target: { value: 'high' } })
+    fireEvent.click(screen.getByText('追加'))
+    expect((onAdd.mock.calls[0][0] as Task).priority).toBe('high')
+  })
+
+  it('カテゴリ select 変更後 submit すると Task.category に反映される', () => {
+    const onAdd = vi.fn()
+    render(<TaskForm onAdd={onAdd} onClose={vi.fn()} categories={cats} />)
+    fireEvent.change(screen.getByPlaceholderText('タスク名'), { target: { value: 'T' } })
+    const categorySelect = screen
+      .getAllByRole('combobox')
+      .find((el) =>
+        Array.from((el as HTMLSelectElement).options).some((o) => o.value === '案件'),
+      ) as HTMLSelectElement
+    fireEvent.change(categorySelect, { target: { value: '案件' } })
+    fireEvent.click(screen.getByText('追加'))
+    expect((onAdd.mock.calls[0][0] as Task).category).toBe('案件')
+  })
+
   it('期限日とメモを入力して submit すると Task に反映される', () => {
     const onAdd = vi.fn()
     render(<TaskForm onAdd={onAdd} onClose={vi.fn()} categories={cats} />)

@@ -259,6 +259,46 @@ describe('CategoriesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '追加' }))
     await waitFor(() => expect(screen.getByText('作成失敗')).toBeInTheDocument())
   })
+
+  it('新規作成: Error 以外の rejection は String 変換でエラー表示', async () => {
+    vi.mocked(loadCategories).mockResolvedValue(cats)
+    vi.mocked(apiCreateCategory).mockRejectedValue('plain-string-error')
+    renderPage()
+    await waitFor(() => expect(screen.getByText('案件')).toBeInTheDocument())
+    const input = screen.getByPlaceholderText('新しいカテゴリ名') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '新規' } })
+    fireEvent.click(screen.getByRole('button', { name: '追加' }))
+    await waitFor(() => expect(screen.getByText('plain-string-error')).toBeInTheDocument())
+  })
+
+  it('読み込みエラーで Error 以外の rejection も String 変換で表示', async () => {
+    vi.mocked(loadCategories).mockRejectedValue('boom')
+    renderPage()
+    await waitFor(() => expect(screen.getByText('boom')).toBeInTheDocument())
+  })
+
+  it('taskCount が undefined のカテゴリは「0件」と表示される', async () => {
+    const noCount: Category[] = [
+      { id: 'x1', userId: 'u1', name: 'カウント無し', sortOrder: 0, createdAt: '' },
+    ]
+    vi.mocked(loadCategories).mockResolvedValue(noCount)
+    renderPage()
+    await waitFor(() => expect(screen.getByText('カウント無し')).toBeInTheDocument())
+    expect(screen.getByText('0件')).toBeInTheDocument()
+  })
+
+  it('マウント中にアンマウントされたら setCategories は呼ばれない（cancelled 分岐）', async () => {
+    let resolve!: (v: Category[]) => void
+    vi.mocked(loadCategories).mockImplementation(
+      () => new Promise<Category[]>((r) => (resolve = r)),
+    )
+    const { unmount } = renderPage()
+    expect(screen.getByText(/読み込み中/)).toBeInTheDocument()
+    unmount()
+    resolve(cats) // unmount 後に解決 → cancelled=true 分岐に入る
+    // 何も throw しないことが目的（state 更新の React 警告も出ない）
+    await new Promise((r) => setTimeout(r, 0))
+  })
 })
 
 // 別の describe ブロックで DndContext をモックして handleDragEnd を直接呼ぶ

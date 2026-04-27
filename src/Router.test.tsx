@@ -80,6 +80,12 @@ describe('AppRouter', () => {
     expect(screen.getByTestId('login-page')).toBeInTheDocument()
   })
 
+  it('PublicRoute の loading 中は何も表示しない（/login）', () => {
+    useAuthMock.mockReturnValue({ user: null, loading: true })
+    const { container } = renderAt('/login')
+    expect(container.querySelector('[data-testid]')).toBeNull()
+  })
+
   it('未認証で /register にアクセスすると登録ページ', () => {
     useAuthMock.mockReturnValue({ user: null, loading: false })
     renderAt('/register')
