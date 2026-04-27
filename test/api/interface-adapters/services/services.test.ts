@@ -44,4 +44,12 @@ describe('JoseTokenService', () => {
     const token = await other.issue('user-1')
     expect(await svc.verify(token)).toBeNull()
   })
+
+  it('alg=none などの非 HS256 トークンは null（アルゴリズム固定）', async () => {
+    // jose の SignJWT は alg=none を許容しないので、手動で unsigned JWT を作る
+    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')
+    const payload = Buffer.from(JSON.stringify({ sub: 'user-1' })).toString('base64url')
+    const noneToken = `${header}.${payload}.`
+    expect(await svc.verify(noneToken)).toBeNull()
+  })
 })

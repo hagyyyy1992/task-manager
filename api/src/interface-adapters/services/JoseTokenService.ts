@@ -28,7 +28,8 @@ export class JoseTokenService implements TokenService {
 
   async verify(token: string): Promise<VerifiedToken | null> {
     try {
-      const { payload } = await jwtVerify(token, this.secret)
+      // alg を HS256 に固定。明示しないと alg 取り違え攻撃 (RS/ES や none) のリスクが残る
+      const { payload } = await jwtVerify(token, this.secret, { algorithms: ['HS256'] })
       const userId = payload.sub
       if (typeof userId !== 'string') return null
       // 旧トークン（scope claim 無し）は session として扱う
