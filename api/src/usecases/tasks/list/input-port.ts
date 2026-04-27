@@ -1,3 +1,9 @@
+export interface ListTasksInput {
+  userId: string
+  cursor?: string
+  limit?: number
+}
+
 export interface ListTasksUseCase {
-  execute(userId: string): Promise<import('./output-port.js').ListTasksOutput>
+  execute(input: ListTasksInput): Promise<import('./output-port.js').ListTasksOutput>
 }

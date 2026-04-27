@@ -294,7 +294,7 @@ describe('auth middleware', () => {
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000),
     })
-    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
     expect(res.status).toBe(200)
   })
@@ -314,7 +314,7 @@ describe('auth middleware', () => {
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000), // = 10:00:00
     })
-    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
     expect(res.status).toBe(200)
   })
@@ -332,7 +332,7 @@ describe('auth middleware', () => {
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 5,
     })
-    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
     expect(res.status).toBe(200)
   })
@@ -353,12 +353,53 @@ describe('task endpoints', () => {
     expect(res.status).toBe(204)
   })
 
-  it('GET /api/tasks returns task list', async () => {
-    vi.mocked(container.listTasks.execute).mockResolvedValue([mockTask])
+  it('GET /api/tasks returns paginated page { items, nextCursor }', async () => {
+    vi.mocked(container.listTasks.execute).mockResolvedValue({
+      items: [mockTask],
+      nextCursor: null,
+    })
     const res = await req('/api/tasks')
     expect(res.status).toBe(200)
-    expect(container.listTasks.execute).toHaveBeenCalledWith('user123')
-    expect(await res.json()).toEqual([mockTask])
+    expect(container.listTasks.execute).toHaveBeenCalledWith({
+      userId: 'user123',
+      cursor: undefined,
+      limit: undefined,
+    })
+    expect(await res.json()).toEqual({ items: [mockTask], nextCursor: null })
+  })
+
+  // issue #40: cursor / limit クエリを interactor へ渡す
+  it('GET /api/tasks?cursor=X&limit=N parses query into interactor input', async () => {
+    vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
+    await req('/api/tasks?cursor=abc&limit=20')
+    expect(container.listTasks.execute).toHaveBeenCalledWith({
+      userId: 'user123',
+      cursor: 'abc',
+      limit: 20,
+    })
+  })
+
+  it('GET /api/tasks: 不正な limit (NaN/負/小数) は無視され undefined で渡される', async () => {
+    vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
+    await req('/api/tasks?limit=abc')
+    expect(container.listTasks.execute).toHaveBeenLastCalledWith({
+      userId: 'user123',
+      cursor: undefined,
+      limit: undefined,
+    })
+    await req('/api/tasks?limit=-5')
+    expect(container.listTasks.execute).toHaveBeenLastCalledWith({
+      userId: 'user123',
+      cursor: undefined,
+      limit: undefined,
+    })
+    // 小数は floor される (10.7 → 10)
+    await req('/api/tasks?limit=10.7')
+    expect(container.listTasks.execute).toHaveBeenLastCalledWith({
+      userId: 'user123',
+      cursor: undefined,
+      limit: 10,
+    })
   })
 
   it('POST /api/tasks creates a task', async () => {

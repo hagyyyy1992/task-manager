@@ -1,6 +1,26 @@
-import type { TaskRepository, TaskListFilter } from '../../domain/repositories/TaskRepository.js'
+import type {
+  TaskRepository,
+  TaskListFilter,
+  TaskListPage,
+} from '../../domain/repositories/TaskRepository.js'
 import type { Task, TaskUpdate } from '../../domain/entities/Task.js'
 import type { PrismaClient } from '../../framework/prisma/client.js'
+
+// cursor は base64url(id)。デコード失敗時はカーソル無視扱いとして 1 ページ目を返す
+function encodeCursor(id: string): string {
+  return Buffer.from(id, 'utf-8').toString('base64url')
+}
+function decodeCursor(cursor: string): string | null {
+  try {
+    const id = Buffer.from(cursor, 'base64url').toString('utf-8')
+    return id.length > 0 ? id : null
+  } catch {
+    return null
+  }
+}
+
+const DEFAULT_LIMIT = 100
+const MAX_LIMIT = 500
 
 interface DbTaskRow {
   id: string
@@ -33,17 +53,36 @@ function toEntity(row: DbTaskRow): Task {
 export class PrismaTaskRepository implements TaskRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async list(filter: TaskListFilter): Promise<Task[]> {
+  async list(filter: TaskListFilter): Promise<TaskListPage> {
     const where: Record<string, unknown> = { userId: filter.userId }
     if (filter.status) where.status = filter.status
     if (filter.category) where.category = filter.category
 
+    const limit = Math.min(Math.max(filter.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT)
+    // limit + 1 件取得して hasMore 判定。次ページの cursor は最後の item.id を再利用
+    const take = limit + 1
+
+    // ピン済みを最上部 → createdAt 降順 → id 降順 (cursor 安定化のため tie-breaker)
+    const orderBy = [
+      { pinned: 'desc' as const },
+      { createdAt: 'desc' as const },
+      { id: 'desc' as const },
+    ]
+
+    const cursorId = filter.cursor ? decodeCursor(filter.cursor) : null
     const rows = await this.prisma.task.findMany({
       where,
-      // ピン済みを常に最上部に。同区分内は createdAt 降順。
-      orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+      orderBy,
+      take,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     })
-    return rows.map(toEntity)
+
+    const hasMore = rows.length > limit
+    const pageRows = hasMore ? rows.slice(0, limit) : rows
+    const nextCursor =
+      hasMore && pageRows.length > 0 ? encodeCursor(pageRows[pageRows.length - 1].id) : null
+
+    return { items: pageRows.map(toEntity), nextCursor }
   }
 
   async create(task: Task, userId: string): Promise<void> {
