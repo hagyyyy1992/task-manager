@@ -69,7 +69,14 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   const categoryRepo = new PrismaCategoryRepository(prisma)
   const userRepo = new PrismaUserRepository(prisma)
   const passwords = new ScryptPasswordHashService()
-  const tokens = overrides.tokens ?? new JoseTokenService(process.env.JWT_SECRET ?? '')
+  let tokens: TokenService
+  if (overrides.tokens) {
+    tokens = overrides.tokens
+  } else {
+    const secret = process.env.JWT_SECRET
+    if (!secret) throw new Error('JWT_SECRET is required')
+    tokens = new JoseTokenService(secret)
+  }
 
   const isRegistrationAllowed = () => process.env.ALLOW_REGISTRATION === 'true'
 
