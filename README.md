@@ -19,10 +19,12 @@ https://d3pi0juuilndgb.cloudfront.net
 task-manager/
 ├── src/               # React フロントエンド（Vite）
 ├── prisma/            # Prisma スキーマ・マイグレーション
-├── auth.ts            # JWT認証・パスワードハッシュ
-├── db.ts              # Prisma Client + DB操作関数
-├── handler.ts         # Lambda ハンドラー
-├── api-server.ts      # ローカル開発用 API サーバー（port 3456）
+├── api/               # バックエンド (Hono)
+│   ├── index.ts       # Hono app（CORS / 認証ミドルウェア / ルート集約）
+│   ├── lambda.ts      # AWS Lambda エントリ（@hono/aws-lambda）
+│   ├── dev.ts         # ローカル開発用 Node サーバ（port 3456）
+│   ├── routes/        # auth / tasks / categories
+│   └── lib/           # db.ts (Prisma) / auth.ts (JWT)
 ├── migrate.ts         # マイグレーション + シード
 ├── mcp-server.ts      # Claude Code 連携用 MCP サーバー（認証必須）
 └── issue-token.ts     # MCP用 長期JWT 発行 CLI
@@ -34,7 +36,7 @@ task-manager/
 | ----------------- | -------------------------------------------- |
 | フロントエンド    | React 19 + TypeScript + Vite + Tailwind CSS  |
 | ルーティング      | react-router-dom                             |
-| API サーバー      | Node.js (http モジュール)                    |
+| API サーバー      | Hono (Node / AWS Lambda 両対応)              |
 | ORM               | Prisma + @prisma/adapter-neon                |
 | データベース      | Neon PostgreSQL                              |
 | 認証              | JWT (jose) + crypto.scrypt                   |
@@ -68,7 +70,7 @@ cp .env.example .env
 - `TASK_APP_TOKEN` — MCP サーバーを使う場合のみ
 
 `JWT_SECRET` は未設定だと起動時に例外を投げる（fail-fast）。
-`db.ts` が起動時に `.env` を自動読み込みするため、スクリプト側で `dotenv` 不要。
+`api/lib/db.ts` が起動時に `.env` を自動読み込みするため、スクリプト側で `dotenv` 不要。
 
 ### 3. Prisma Client 生成
 
@@ -96,11 +98,11 @@ npm run dev
 ### API サーバー
 
 ```bash
-npx tsx api-server.ts
+npm run dev:api
 # → http://localhost:3456
 ```
 
-フロントエンドはこの API サーバーを通じて DB と通信する。
+フロントエンドはこの API サーバーを通じて DB と通信する。本番（Lambda）では `api/lambda.ts` を esbuild でバンドルした成果物が同じ Hono app を提供する。
 
 ## REST API
 

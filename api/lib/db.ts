@@ -1,11 +1,12 @@
-import { PrismaClient } from './src/generated/prisma/client.js'
+import { PrismaClient } from '../../src/generated/prisma/client.js'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { readFileSync, existsSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const envFile = join(__dirname, '.env')
+// repo root (api/lib/db.ts → ../../.env)
+const envFile = join(__dirname, '..', '..', '.env')
 if (existsSync(envFile)) {
   for (const line of readFileSync(envFile, 'utf-8').split('\n')) {
     const idx = line.indexOf('=')

@@ -52,7 +52,7 @@ class FakePrismaClient {
   $transaction = dollarTransaction
 }
 
-vi.mock('./src/generated/prisma/client.js', () => ({
+vi.mock('../../src/generated/prisma/client.js', () => ({
   PrismaClient: FakePrismaClient,
 }))
 

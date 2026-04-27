@@ -10,8 +10,8 @@ import {
   loadCategories,
   findUserById,
   type Task,
-} from './db.js'
-import { verifyToken } from './auth.js'
+} from './api/lib/db.js'
+import { verifyToken } from './api/lib/auth.js'
 
 const token = process.env.TASK_APP_TOKEN
 if (!token) {
@@ -115,6 +115,7 @@ server.tool(
       category,
       dueDate: dueDate ?? null,
       memo,
+      pinned: false,
       createdAt: now,
       updatedAt: now,
     }

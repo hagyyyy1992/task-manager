@@ -1,5 +1,5 @@
-import { findUserByEmail } from './db.js'
-import { createLongLivedToken } from './auth.js'
+import { findUserByEmail } from './api/lib/db.js'
+import { createLongLivedToken } from './api/lib/auth.js'
 
 const email = process.argv[2]
 if (!email) {
