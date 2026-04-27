@@ -1,30 +1,64 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { fileURLToPath } from 'url'
+import { dirname, resolve } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  // Vite はフロント関連（index.html / public / src）を front/ 配下から拾う
+  root: 'front',
+  publicDir: 'public',
   plugins: [react(), tailwindcss()],
   appType: 'spa',
+  build: {
+    outDir: '../dist',
+    emptyOutDir: true,
+  },
+  resolve: {
+    alias: {
+      // テストは task-app/test/ に集約。ソース実体は front/src と api/src にある。
+      '@': resolve(__dirname, 'front/src'),
+      '@api': resolve(__dirname, 'api/src'),
+    },
+  },
   test: {
+    // vitest は task-app ルートを基準に動かす
+    root: '.',
     environment: 'jsdom',
-    setupFiles: ['./src/test-setup.ts'],
+    setupFiles: ['./front/src/test-setup.ts'],
+    include: ['test/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      include: ['src/**/*.{ts,tsx}', 'db.ts', 'handler.ts'],
+      include: [
+        'front/src/**/*.{ts,tsx}',
+        'api/src/domain/**/*.ts',
+        'api/src/usecases/**/*.ts',
+        'api/src/interface-adapters/**/*.ts',
+        'api/src/framework/**/*.ts',
+      ],
       exclude: [
-        'src/generated/**',
-        'src/**/*.d.ts',
-        'src/test-setup.ts',
-        'src/main.tsx',
-        'src/vite-env.d.ts',
+        'front/src/generated/**',
+        'front/src/**/*.d.ts',
+        'front/src/test-setup.ts',
+        'front/src/main.tsx',
+        'front/src/vite-env.d.ts',
         // 型のみのファイル（実行コードなし）。v8 が 0/0 を 0% と表示するため除外。
-        'src/types.ts',
+        'front/src/types.ts',
+        // インターフェース宣言ファイル（型のみ、実行コードなし）
+        'api/src/domain/repositories/**',
+        'api/src/domain/services/**',
+        'api/src/domain/entities/User.ts',
+        'api/src/domain/entities/Task.ts',
+        'api/src/usecases/**/input-port.ts',
+        'api/src/usecases/**/output-port.ts',
+        // ランタイム接続層（DB / .env を直接触る）。E2E 領域なので単体カバレッジ除外
+        'api/src/framework/prisma/**',
+        // DI コンテナは prisma 実体に依存するためユニットでは検査しない
+        'api/src/framework/di/**',
         '**/*.test.{ts,tsx}',
-        // api-server.ts は handler.ts と同等ロジックのローカル開発用 HTTP サーバ。
-        // モジュール先頭で server.listen を呼ぶ構造のため単体テストが困難。
-        // 等価性は handler.test.ts でカバーする。
-        'api-server.ts',
       ],
       // 達成値からおよそ -2% の余裕を残してロック。CI 揺れによる即時破断を避けるため。
       thresholds: {

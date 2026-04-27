@@ -1,5 +1,6 @@
-import { findUserByEmail } from './db.js'
-import { createLongLivedToken } from './auth.js'
+import { createPrismaClient } from './api/src/framework/prisma/client.js'
+import { PrismaUserRepository } from './api/src/interface-adapters/repositories/PrismaUserRepository.js'
+import { JoseTokenService } from './api/src/interface-adapters/services/JoseTokenService.js'
 
 const email = process.argv[2]
 if (!email) {
@@ -7,11 +8,13 @@ if (!email) {
   process.exit(1)
 }
 
-const user = await findUserByEmail(email)
+const userRepo = new PrismaUserRepository(createPrismaClient())
+const user = await userRepo.findByEmail(email)
 if (!user) {
   console.error(`User not found: ${email}`)
   process.exit(1)
 }
 
-const token = await createLongLivedToken(user.id)
+const tokens = new JoseTokenService(process.env.JWT_SECRET ?? '')
+const token = await tokens.issueLongLived(user.id)
 console.log(token)

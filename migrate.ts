@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless'
 import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { DEFAULT_CATEGORIES } from './db.js'
+import { DEFAULT_CATEGORIES } from './api/src/domain/entities/Category.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_FILE = join(__dirname, 'data', 'tasks.json')

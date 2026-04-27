@@ -12,7 +12,7 @@ npm run build
 echo "=== 2. Lambdaバンドル ==="
 mkdir -p terraform/.lambda-build
 
-npx esbuild handler.ts \
+npx esbuild api/lambda.ts \
   --bundle \
   --platform=node \
   --target=node22 \
