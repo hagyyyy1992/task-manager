@@ -15,11 +15,15 @@ function emailFingerprint(email: string): string {
 
 // ユーザー不在時もダミーハッシュに対して verify を実行することで scrypt の
 // 計算時間を消費し、応答時間差から user enumeration されないようにする。
-// 起動時に一度だけ計算してキャッシュ。
+// 起動時に一度だけ計算してキャッシュ。reject 時はキャッシュを破棄して
+// 次回再試行できるようにする (rejected promise を握り続けると以後の login が永久に失敗する)
 let dummyHashPromise: Promise<string> | null = null
 function getDummyHash(passwords: PasswordHashService): Promise<string> {
   if (!dummyHashPromise) {
-    dummyHashPromise = passwords.hash('timing-attack-mitigation-placeholder')
+    dummyHashPromise = passwords.hash('timing-attack-mitigation-placeholder').catch((e) => {
+      dummyHashPromise = null
+      throw e
+    })
   }
   return dummyHashPromise
 }
