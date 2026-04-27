@@ -33,12 +33,15 @@ export function buildApp(options: BuildAppOptions = {}): Hono<AuthEnv> {
   const container = options.container ?? createContainer(options.containerOverrides)
   const app = new Hono<AuthEnv>()
 
+  // CORS allowlist は buildApp 時点で 1 度だけ評価する（per-request の env 再パースを回避）
+  const allowedOrigins = getAllowedOrigins()
+
   app.use(
     '*',
     cors({
       origin: (origin) => {
         if (!origin) return null
-        return getAllowedOrigins().includes(origin) ? origin : null
+        return allowedOrigins.includes(origin) ? origin : null
       },
       allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization'],
