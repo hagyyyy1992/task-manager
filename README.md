@@ -1,8 +1,7 @@
 # task-manager
-
-自分用のタスク管理アプリ。<br>
-React フロントエンド + Node.js API サーバーの2層構成。<br>
-Neon PostgreSQL をバックエンドに使用することで複数端末間でタスクを同期できる。
+自分用のタスク管理アプリ。Claude Codeなどのタスク情報をMCPで同期して永続化するのに活用している。<br>
+React フロントエンド + Hono API サーバーの2層構成。<br>
+Neon をバックエンドDBに使用することで複数端末間でタスクを同期できる。<br>
 
 アプリURL:
 https://d3pi0juuilndgb.cloudfront.net
