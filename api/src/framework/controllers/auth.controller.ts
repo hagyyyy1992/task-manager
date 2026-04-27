@@ -38,7 +38,7 @@ export function createAuthController(container: Container) {
 
   // protected
   const protectedRoutes = new Hono<AuthEnv>()
-  protectedRoutes.use('*', createAuthMiddleware(container.tokens))
+  protectedRoutes.use('*', createAuthMiddleware(container.tokens, container.users))
 
   protectedRoutes.get('/me', async (c) => {
     const result = await container.me.execute(c.get('userId'))

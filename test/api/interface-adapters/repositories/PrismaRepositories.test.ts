@@ -26,6 +26,7 @@ const userRow = {
   email: 'a@b.com',
   name: 'X',
   passwordHash: 'h',
+  passwordChangedAt: null as Date | null,
   termsAgreedAt: null as Date | null,
   createdAt: baseDate,
   updatedAt: baseDate,
@@ -420,6 +421,25 @@ describe('PrismaUserRepository', () => {
     prisma.user.update.mockResolvedValue(userRow)
     const repo = new PrismaUserRepository(prisma as unknown as never)
     expect(await repo.updatePassword('u1', 'newh')).toBe(true)
+  })
+
+  // issue #36: passwordChangedAt を update 時に現在時刻で更新する（auth middleware の失効基準点）
+  it('updatePassword: passwordChangedAt と updatedAt を同じ now で更新する', async () => {
+    prisma.user.findUnique.mockResolvedValue(userRow)
+    prisma.user.update.mockResolvedValue(userRow)
+    const repo = new PrismaUserRepository(prisma as unknown as never)
+    const before = Date.now()
+    await repo.updatePassword('u1', 'newh')
+    const after = Date.now()
+    const callArgs = prisma.user.update.mock.calls[0][0] as {
+      data: { passwordHash: string; passwordChangedAt: Date; updatedAt: Date }
+    }
+    expect(callArgs.data.passwordHash).toBe('newh')
+    expect(callArgs.data.passwordChangedAt).toBeInstanceOf(Date)
+    expect(callArgs.data.passwordChangedAt.getTime()).toBeGreaterThanOrEqual(before)
+    expect(callArgs.data.passwordChangedAt.getTime()).toBeLessThanOrEqual(after)
+    // updatedAt と同一インスタンスであることで「同瞬間」を保証
+    expect(callArgs.data.updatedAt).toBe(callArgs.data.passwordChangedAt)
   })
 
   it('delete: 存在しない場合は false', async () => {

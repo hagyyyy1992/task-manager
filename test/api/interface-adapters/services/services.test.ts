@@ -37,14 +37,24 @@ describe('JoseTokenService', () => {
     expect(() => new JoseTokenService('')).toThrow()
   })
 
-  it('issue → verify で userId と scope=session を復元', async () => {
+  it('issue → verify で userId / scope=session / iat (現在時刻 ±1s 以内) を復元', async () => {
+    const before = Math.floor(Date.now() / 1000)
     const token = await svc.issue('user-1')
-    expect(await svc.verify(token)).toEqual({ userId: 'user-1', scope: 'session' })
+    const verified = await svc.verify(token)
+    expect(verified?.userId).toBe('user-1')
+    expect(verified?.scope).toBe('session')
+    expect(verified?.issuedAt).toBeGreaterThanOrEqual(before)
+    expect(verified?.issuedAt).toBeLessThanOrEqual(before + 1)
   })
 
-  it('issueLongLived は scope=mcp を返す', async () => {
+  it('issueLongLived は scope=mcp と iat を返す', async () => {
+    const before = Math.floor(Date.now() / 1000)
     const token = await svc.issueLongLived('user-1')
-    expect(await svc.verify(token)).toEqual({ userId: 'user-1', scope: 'mcp' })
+    const verified = await svc.verify(token)
+    expect(verified?.userId).toBe('user-1')
+    expect(verified?.scope).toBe('mcp')
+    expect(verified?.issuedAt).toBeGreaterThanOrEqual(before)
+    expect(verified?.issuedAt).toBeLessThanOrEqual(before + 1)
   })
 
   it('改竄/不正トークンは null', async () => {
