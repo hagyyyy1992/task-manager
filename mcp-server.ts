@@ -27,8 +27,9 @@ if (!verified) {
 if (verified.scope !== 'mcp') {
   throw new Error('TASK_APP_TOKEN の scope が mcp ではありません')
 }
+const userId = verified.userId
 
-const currentUser = await userRepo.findById(verified.userId)
+const currentUser = await userRepo.findById(userId)
 if (!currentUser) {
   throw new Error('TASK_APP_TOKEN のユーザーが DB に存在しません')
 }
