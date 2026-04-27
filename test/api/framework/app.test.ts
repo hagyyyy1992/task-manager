@@ -299,6 +299,44 @@ describe('auth middleware', () => {
     expect(res.status).toBe(200)
   })
 
+  // codex 指摘 #2: 同一秒内・サブ秒精度差での誤判定がないことを担保 (PR #44)
+  // - passwordChangedAt が 10:00:00.900 の場合、「同秒・後ms」に発行された新トークン
+  //   (iat=10:00:00) は受理されるべき。秒切捨て比較により誤 401 にならないことを検証。
+  it('accepts new token issued in the same second but later ms than passwordChangedAt', async () => {
+    const passwordChangedAt = new Date('2026-04-27T10:00:00.900Z') // .900ms
+    vi.mocked(container.users.findById).mockResolvedValue({
+      ...mockUser,
+      passwordChangedAt: passwordChangedAt.toISOString(),
+    })
+    // 新トークン発行時刻 10:00:00.950Z → iat = floor(.../1000) = 10:00:00 (秒)
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000), // = 10:00:00
+    })
+    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(200)
+  })
+
+  // codex 指摘 #2: clock skew 5 秒以内であれば旧トークンも受理される (Lambda 時計ずれ吸収)
+  it('accepts token issued up to 5s before passwordChangedAt (clock skew grace)', async () => {
+    const passwordChangedAt = new Date('2026-04-27T10:00:00.000Z')
+    vi.mocked(container.users.findById).mockResolvedValue({
+      ...mockUser,
+      passwordChangedAt: passwordChangedAt.toISOString(),
+    })
+    // iat = passwordChangedAt の 5 秒前 (境界、grace 内)
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 5,
+    })
+    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(200)
+  })
+
   it('returns 401 when user has been deleted (findById returns null)', async () => {
     vi.mocked(container.users.findById).mockResolvedValue(null)
     const res = await req('/api/tasks')
