@@ -2,28 +2,30 @@ import { randomUUID } from 'crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import {
-  loadTasks,
-  createTask,
-  updateTask,
-  deleteTask,
-  loadCategories,
-  findUserById,
-  type Task,
-} from './api/lib/db.js'
-import { verifyToken } from './api/lib/auth.js'
+import { createPrismaClient } from './api/src/framework/prisma/client.js'
+import { PrismaTaskRepository } from './api/src/interface-adapters/repositories/PrismaTaskRepository.js'
+import { PrismaCategoryRepository } from './api/src/interface-adapters/repositories/PrismaCategoryRepository.js'
+import { PrismaUserRepository } from './api/src/interface-adapters/repositories/PrismaUserRepository.js'
+import { JoseTokenService } from './api/src/interface-adapters/services/JoseTokenService.js'
+import type { Task } from './api/src/domain/entities/Task.js'
 
 const token = process.env.TASK_APP_TOKEN
 if (!token) {
   throw new Error('TASK_APP_TOKEN is required (long-lived JWT for MCP access)')
 }
 
-const userId = await verifyToken(token)
+const prisma = createPrismaClient()
+const taskRepo = new PrismaTaskRepository(prisma)
+const categoryRepo = new PrismaCategoryRepository(prisma)
+const userRepo = new PrismaUserRepository(prisma)
+const tokens = new JoseTokenService(process.env.JWT_SECRET ?? '')
+
+const userId = await tokens.verify(token)
 if (!userId) {
   throw new Error('TASK_APP_TOKEN is invalid or expired')
 }
 
-const currentUser = await findUserById(userId)
+const currentUser = await userRepo.findById(userId)
 if (!currentUser) {
   throw new Error('TASK_APP_TOKEN のユーザーが DB に存在しません')
 }
@@ -64,7 +66,7 @@ server.tool(
     category: z.string().optional().describe('フィルタするカテゴリ'),
   },
   async ({ status, category }) => {
-    const tasks = await loadTasks({ userId, status, category })
+    const tasks = await taskRepo.list({ userId, status, category })
     if (tasks.length === 0) {
       return { content: [{ type: 'text', text: 'タスクはありません' }] }
     }
@@ -81,7 +83,7 @@ server.tool(
 )
 
 server.tool('list_categories', '自分のカテゴリ一覧を取得', {}, async () => {
-  const categories = await loadCategories(userId)
+  const categories = await categoryRepo.list(userId)
   if (categories.length === 0) {
     return { content: [{ type: 'text', text: 'カテゴリはありません' }] }
   }
@@ -119,7 +121,7 @@ server.tool(
       createdAt: now,
       updatedAt: now,
     }
-    await createTask(task, userId)
+    await taskRepo.create(task, userId)
     return {
       content: [{ type: 'text', text: `作成しました: ${task.title} (id: ${task.id})` }],
     }
@@ -138,7 +140,7 @@ server.tool(
     dueDate: z.string().optional().describe('期限 (YYYY-MM-DD)。空文字で削除'),
   },
   async ({ id, ...updates }) => {
-    const normalized: Parameters<typeof updateTask>[1] = {}
+    const normalized: Parameters<typeof taskRepo.update>[1] = {}
     if (updates.title !== undefined) normalized.title = updates.title
     if (updates.status !== undefined) normalized.status = updates.status
     if (updates.priority !== undefined) normalized.priority = updates.priority
@@ -147,7 +149,7 @@ server.tool(
       normalized.dueDate = updates.dueDate === '' ? null : updates.dueDate
     }
 
-    const updated = await updateTask(id, normalized, userId)
+    const updated = await taskRepo.update(id, normalized, userId)
     if (!updated) {
       return {
         content: [{ type: 'text', text: `タスクが見つかりません: ${id}` }],
@@ -169,7 +171,7 @@ server.tool(
       .describe('削除対象タスクのタイトル。実際のタイトルと一致しない場合は削除されない'),
   },
   async ({ id, expectedTitle }) => {
-    const tasks = await loadTasks({ userId })
+    const tasks = await taskRepo.list({ userId })
     const target = tasks.find((t) => t.id === id)
     if (!target) {
       return {
@@ -186,7 +188,7 @@ server.tool(
         ],
       }
     }
-    const deleted = await deleteTask(id, userId)
+    const deleted = await taskRepo.delete(id, userId)
     if (!deleted) {
       return {
         content: [{ type: 'text', text: `タスクが見つかりません: ${id}` }],

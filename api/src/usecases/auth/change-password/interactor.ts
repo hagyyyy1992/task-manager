@@ -1,0 +1,43 @@
+import type { UserRepository } from '../../../domain/repositories/UserRepository.js'
+import type { PasswordHashService } from '../../../domain/services/PasswordHashService.js'
+import type { ChangePasswordInput, ChangePasswordUseCase } from './input-port.js'
+import type { ChangePasswordOutput } from './output-port.js'
+
+export class ChangePasswordInteractor implements ChangePasswordUseCase {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly passwords: PasswordHashService,
+  ) {}
+
+  async execute(input: ChangePasswordInput): Promise<ChangePasswordOutput> {
+    if (!input.currentPassword || !input.newPassword) {
+      return {
+        ok: false,
+        reason: 'invalid_input',
+        message: 'currentPassword and newPassword are required',
+      }
+    }
+    if (input.newPassword.length < 8) {
+      return {
+        ok: false,
+        reason: 'invalid_input',
+        message: 'new password must be at least 8 characters',
+      }
+    }
+
+    const me = await this.users.findById(input.userId)
+    if (!me) return { ok: false, reason: 'unauthorized', message: 'unauthorized' }
+
+    const userRow = await this.users.findByEmail(me.email)
+    if (!userRow) return { ok: false, reason: 'not_found', message: 'user not found' }
+
+    const valid = await this.passwords.verify(input.currentPassword, userRow.passwordHash)
+    if (!valid) {
+      return { ok: false, reason: 'wrong_password', message: 'current password is incorrect' }
+    }
+
+    const newHash = await this.passwords.hash(input.newPassword)
+    await this.users.updatePassword(input.userId, newHash)
+    return { ok: true }
+  }
+}

@@ -17,17 +17,23 @@ https://d3pi0juuilndgb.cloudfront.net
 
 ```
 task-manager/
-├── src/               # React フロントエンド（Vite）
-├── prisma/            # Prisma スキーマ・マイグレーション
-├── api/               # バックエンド (Hono)
-│   ├── index.ts       # Hono app（CORS / 認証ミドルウェア / ルート集約）
-│   ├── lambda.ts      # AWS Lambda エントリ（@hono/aws-lambda）
-│   ├── dev.ts         # ローカル開発用 Node サーバ（port 3456）
-│   ├── routes/        # auth / tasks / categories
-│   └── lib/           # db.ts (Prisma) / auth.ts (JWT)
-├── migrate.ts         # マイグレーション + シード
-├── mcp-server.ts      # Claude Code 連携用 MCP サーバー（認証必須）
-└── issue-token.ts     # MCP用 長期JWT 発行 CLI
+├── front/                              # フロントエンド (React + Vite)
+│   ├── index.html
+│   ├── public/
+│   └── src/                            # React/TS ソース一式
+├── api/                                # バックエンド (Hono + クリーンアーキテクチャ)
+│   ├── dev.ts                          # ローカル Node サーバ (port 3456)
+│   ├── lambda.ts                       # AWS Lambda エントリ
+│   └── src/
+│       ├── domain/                     # entities / value-objects / repositories(I/F) / services(I/F) / exceptions
+│       ├── usecases/                   # auth / tasks / categories（input-port / interactor / output-port）
+│       ├── interface-adapters/         # Prisma リポジトリ実装、scrypt / jose サービス実装
+│       └── framework/                  # Hono app / controllers / middleware / DI / Prisma client
+├── test/                               # 全テスト（front/src と api/src を mirror）
+├── prisma/                             # Prisma スキーマ・マイグレーション
+├── migrate.ts                          # マイグレーション + シード
+├── mcp-server.ts                       # Claude Code 連携用 MCP サーバー
+└── issue-token.ts                      # MCP用 長期JWT 発行 CLI
 ```
 
 ## 技術スタック
@@ -69,8 +75,8 @@ cp .env.example .env
 - `JWT_SECRET` — JWT 署名用の乱数（`openssl rand -base64 48` 推奨）
 - `TASK_APP_TOKEN` — MCP サーバーを使う場合のみ
 
-`JWT_SECRET` は未設定だと起動時に例外を投げる（fail-fast）。
-`api/lib/db.ts` が起動時に `.env` を自動読み込みするため、スクリプト側で `dotenv` 不要。
+`JWT_SECRET` は未設定だと `JoseTokenService` 構築時に例外を投げる（fail-fast）。
+`api/src/framework/prisma/client.ts` が起動時に `.env` を自動読み込みするため、スクリプト側で `dotenv` 不要。
 
 ### 3. Prisma Client 生成
 

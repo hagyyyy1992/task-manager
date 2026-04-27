@@ -1,5 +1,5 @@
 // Lambda 環境ではコンソール側で env を注入するが、ローカル開発では .env を読み込んでから
-// 後段のモジュール（auth.ts が JWT_SECRET を起動時に検証する）を import する必要がある。
+// 後段のモジュール（auth サービスが JWT_SECRET を起動時に検証する）を import する必要がある。
 import { readFileSync, existsSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
@@ -17,7 +17,7 @@ if (existsSync(envFile)) {
 }
 
 const { serve } = await import('@hono/node-server')
-const { buildApp } = await import('./index.js')
+const { buildApp } = await import('./src/framework/app.js')
 
 const port = Number(process.env.PORT ?? 3456)
 serve({ fetch: buildApp().fetch, port }, (info) => {
