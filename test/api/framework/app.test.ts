@@ -264,18 +264,18 @@ describe('auth middleware', () => {
     expect((await res.json()).error).toBe('token scope not allowed for this endpoint')
   })
 
-  // issue #36: passwordChangedAt より前に発行された JWT は失効扱い
-  it('returns 401 when token iat is older than user.passwordChangedAt', async () => {
+  // issue #36: passwordChangedAt より前に発行された JWT は失効扱い (grace window 5s 越え)
+  it('returns 401 when token iat is clearly older than user.passwordChangedAt (>5s)', async () => {
     const passwordChangedAt = new Date('2026-04-27T10:00:00.000Z')
     vi.mocked(container.users.findById).mockResolvedValue({
       ...mockUser,
       passwordChangedAt: passwordChangedAt.toISOString(),
     })
-    // iat = passwordChangedAt の 1秒前 → 失効
+    // iat = passwordChangedAt の 10 秒前 → grace window (5s) を超えて失効
     vi.mocked(container.tokens.verify).mockResolvedValue({
       userId: 'user123',
       scope: 'session',
-      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 1,
+      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 10,
     })
     const res = await req('/api/tasks')
     expect(res.status).toBe(401)

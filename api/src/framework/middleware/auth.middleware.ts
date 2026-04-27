@@ -28,8 +28,18 @@ export function createAuthMiddleware(
     const user = await users.findById(verified.userId)
     if (!user) return c.json({ error: 'invalid or expired token' }, 401)
     if (user.passwordChangedAt !== null) {
-      // iat (秒) を ms に変換して比較。境界値 iat*1000 == passwordChangedAt は受理（同瞬間に発行）
-      if (verified.issuedAt * 1000 < new Date(user.passwordChangedAt).getTime()) {
+      // JWT iat は秒精度 (Math.floor(ms/1000)) なので、passwordChangedAt も
+      // 秒に切り捨てて比較する。ms 同士で比較すると、同一秒内かつ ms 単位で
+      // パスワード変更より「後」に発行された新トークンを誤って失効扱いに
+      // してしまう (例: pwd=10:00:00.900 → 直後 10:00:00.950 に発行された
+      // 新トークンは iat=10:00:00 で iat*1000=10:00:00.000 < 10:00:00.900
+      // となり 401 になる)。
+      // さらに Lambda 間 / DB 間の clock skew を吸収するため、5 秒の猶予を
+      // 与える。これにより「変更直前 5 秒以内に発行された旧トークン」は
+      // 受理されてしまうが、被害窓口は実用上無視できる範囲。
+      const CLOCK_SKEW_GRACE_SEC = 5
+      const passwordChangedAtSec = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000)
+      if (verified.issuedAt + CLOCK_SKEW_GRACE_SEC < passwordChangedAtSec) {
         return c.json({ error: 'invalid or expired token' }, 401)
       }
     }
