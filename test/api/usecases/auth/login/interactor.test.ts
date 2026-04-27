@@ -61,6 +61,18 @@ describe('LoginInteractor', () => {
     if (!result.ok) expect(result.reason).toBe('invalid_input')
   })
 
+  it('email は trim() + toLowerCase() で正規化してから検索する（register と対称）', async () => {
+    await interactor.execute({ email: '  Test@Example.COM  ', password: 'pw' })
+    expect(users.findByEmail).toHaveBeenCalledWith('test@example.com')
+  })
+
+  it('空白のみ email は invalid_input（findByEmail は呼ばない）', async () => {
+    const result = await interactor.execute({ email: '   ', password: 'pw' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('invalid_input')
+    expect(users.findByEmail).not.toHaveBeenCalled()
+  })
+
   it('ユーザーが見つからない場合も verify を呼んで時間差を消し invalid_credentials', async () => {
     users.findByEmail = vi.fn().mockResolvedValue(null)
     const result = await interactor.execute({ email: 'x@y.com', password: 'pw' })
@@ -77,15 +89,15 @@ describe('LoginInteractor', () => {
     if (!result.ok) expect(result.reason).toBe('invalid_credentials')
   })
 
-  it('失敗時は emailFp と userExists を warn ログ出力する（生 email は出さない）', async () => {
+  it('失敗時は emailFp のみ warn ログ出力する（生 email・userExists は出さない）', async () => {
     const warn = vi.mocked(console.warn)
     passwords.verify = vi.fn().mockResolvedValue(false)
     await interactor.execute({ email: 'logged@example.com', password: 'wrong' })
     const call = warn.mock.calls.find((c) => c[0] === 'auth.login.failed')
     expect(call).toBeDefined()
-    const meta = call?.[1] as { emailFp: string; userExists: boolean }
+    const meta = call?.[1] as { emailFp: string; userExists?: unknown }
     expect(meta.emailFp).toMatch(/^[0-9a-f]{16}$/)
-    expect(meta.userExists).toBe(true)
+    expect(meta).not.toHaveProperty('userExists')
     expect(JSON.stringify(call)).not.toContain('logged@example.com')
   })
 

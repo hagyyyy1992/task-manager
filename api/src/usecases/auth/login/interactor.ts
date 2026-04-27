@@ -32,17 +32,19 @@ export class LoginInteractor implements LoginUseCase {
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
-    if (!input.email || !input.password) {
+    // register 側で email を trim().toLowerCase() して保存しているため、
+    // login でも同じ正規化をしないと case 違いでヒットせず enumeration の余地ができる
+    const email = (input.email ?? '').trim().toLowerCase()
+    if (!email || !input.password) {
       return { ok: false, reason: 'invalid_input', message: 'email and password are required' }
     }
 
-    const userRow = await this.users.findByEmail(input.email)
+    const userRow = await this.users.findByEmail(email)
     const hashToCheck = userRow?.passwordHash ?? (await getDummyHash(this.passwords))
     const valid = await this.passwords.verify(input.password, hashToCheck)
     if (!userRow || !valid) {
       console.warn('auth.login.failed', {
-        emailFp: emailFingerprint(input.email),
-        userExists: !!userRow,
+        emailFp: emailFingerprint(email),
       })
       return { ok: false, reason: 'invalid_credentials', message: INVALID }
     }
