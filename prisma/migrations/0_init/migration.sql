@@ -24,6 +24,7 @@ CREATE TABLE "tasks" (
     "category" TEXT NOT NULL DEFAULT 'その他',
     "due_date" DATE,
     "memo" TEXT NOT NULL DEFAULT '',
+    "pinned" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -52,3 +53,4 @@ ALTER TABLE "tasks" ADD CONSTRAINT "tasks_user_id_fkey" FOREIGN KEY ("user_id") 
 
 -- AddForeignKey
 ALTER TABLE "categories" ADD CONSTRAINT "categories_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

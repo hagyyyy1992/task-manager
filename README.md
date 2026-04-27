@@ -30,8 +30,9 @@ task-manager/
 │       ├── interface-adapters/         # Prisma リポジトリ実装、scrypt / jose サービス実装
 │       └── framework/                  # Hono app / controllers / middleware / DI / Prisma client
 ├── test/                               # 全テスト（front/src と api/src を mirror）
-├── prisma/                             # Prisma スキーマ・マイグレーション
-├── migrate.ts                          # マイグレーション + シード
+├── prisma/
+│   ├── schema.prisma                   # DBスキーマ定義
+│   └── migrations/                     # prisma migrate deploy で適用される SQL
 ├── mcp-server.ts                       # Claude Code 連携用 MCP サーバー
 └── issue-token.ts                      # MCP用 長期JWT 発行 CLI
 ```
@@ -78,19 +79,44 @@ cp .env.example .env
 `JWT_SECRET` は未設定だと `JoseTokenService` 構築時に例外を投げる（fail-fast）。
 `api/src/framework/prisma/client.ts` が起動時に `.env` を自動読み込みするため、スクリプト側で `dotenv` 不要。
 
-### 3. Prisma Client 生成
+### 3. Prisma Client 生成 + マイグレーション適用
 
 ```bash
 npx prisma generate
+npx prisma migrate deploy
 ```
 
-### 4. DB マイグレーション
+`prisma/migrations/` 配下の未適用 SQL がすべて適用される。新規ユーザー向けのデフォルトカテゴリは登録時に自動投入される（DB シード不要）。
+
+### スキーマ変更時の手順
+
+`prisma/schema.prisma` を編集したら:
 
 ```bash
-npx tsx migrate.ts
+# 新しいマイグレーションを生成（Neon の shadow DB 制約を回避するため --create-only）
+npx prisma migrate dev --create-only --name <description>
+
+# 内容を確認後、適用
+npx prisma migrate deploy
+npx prisma generate
 ```
 
-既存ユーザーに対してデフォルトカテゴリが自動作成される。
+CI (`.github/workflows/deploy.yml`) は main マージ時に `prisma migrate deploy` を自動実行する。
+
+### ⚠️ 既存環境のベースライン (本 PR マージ前に一度だけ実行)
+
+本リポジトリは生 SQL の `migrate.ts` から Prisma migrations 運用に移行した。**この移行 PR をマージする前** に、既存の Neon 本番 DB に対して 0_init を「適用済み」マークする必要がある（テーブルは既に存在するため、未マークのまま CI が走ると `CREATE TABLE` 衝突で deploy 失敗）。
+
+```bash
+# 順序が重要 — マージより先に実行すること
+DATABASE_URL='<prod connection string>' npx prisma migrate resolve --applied 0_init
+
+# 完了確認
+DATABASE_URL='<prod connection string>' npx prisma migrate status
+# → "Database schema is up to date!" が出れば OK
+```
+
+実行後は `_prisma_migrations` テーブルに `0_init` が記録され、以降の CI は新規マイグレーションのみ流す。
 
 ## 起動
 

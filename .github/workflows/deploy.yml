@@ -33,10 +33,14 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Run database migration
+      # 初回のみ: 既存テーブル前提の本番 DB に対しては事前に
+      #   DATABASE_URL=... npx prisma migrate resolve --applied 0_init
+      # を一度ローカルで実行して baseline を済ませてある必要がある (README 参照)。
+      # 未実行のまま走ると CREATE TABLE が衝突してこのステップで失敗する。
+      - name: Apply database migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx tsx migrate.ts
+        run: npx prisma migrate deploy
 
       - name: Build frontend
         env:
