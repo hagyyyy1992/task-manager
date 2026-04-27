@@ -65,9 +65,6 @@ export class PrismaTaskRepository implements TaskRepository {
   }
 
   async update(id: string, updates: TaskUpdate, userId: string): Promise<Task | null> {
-    const existing = await this.prisma.task.findFirst({ where: { id, userId } })
-    if (!existing) return null
-
     const data: Record<string, unknown> = { updatedAt: new Date() }
     if (updates.title !== undefined) data.title = updates.title
     if (updates.status !== undefined) data.status = updates.status
@@ -79,14 +76,19 @@ export class PrismaTaskRepository implements TaskRepository {
       data.dueDate = updates.dueDate ? new Date(updates.dueDate + 'T00:00:00Z') : null
     }
 
-    const updated = await this.prisma.task.update({ where: { id }, data })
-    return toEntity(updated)
+    // updateMany の where に userId を含めることで多層防御 + TOCTOU 排除
+    const result = await this.prisma.task.updateMany({ where: { id, userId }, data })
+    if (result.count === 0) return null
+    const updated = await this.prisma.task.findFirst({ where: { id, userId } })
+    return updated ? toEntity(updated) : null
   }
 
   async delete(id: string, userId: string): Promise<Task | null> {
+    // 削除前に entity スナップショットを取得しつつ、deleteMany の where に userId を含めて多層防御
     const existing = await this.prisma.task.findFirst({ where: { id, userId } })
     if (!existing) return null
-    await this.prisma.task.delete({ where: { id } })
+    const result = await this.prisma.task.deleteMany({ where: { id, userId } })
+    if (result.count === 0) return null
     return toEntity(existing)
   }
 }

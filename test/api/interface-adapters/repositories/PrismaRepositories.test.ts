@@ -49,6 +49,7 @@ beforeEach(() => {
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       groupBy: vi.fn(),
     },
     category: {
@@ -116,15 +117,16 @@ describe('PrismaTaskRepository', () => {
     expect(arg.userId).toBe('u1')
   })
 
-  it('update は存在しない id なら null', async () => {
-    prisma.task.findFirst.mockResolvedValue(null)
+  it('update は updateMany が 0 件なら null（他ユーザーの id は更新しない）', async () => {
+    prisma.task.updateMany.mockResolvedValue({ count: 0 })
     const repo = new PrismaTaskRepository(prisma as unknown as never)
     expect(await repo.update('t1', { status: 'done' }, 'u1')).toBeNull()
+    expect(prisma.task.updateMany.mock.calls[0][0].where).toEqual({ id: 't1', userId: 'u1' })
   })
 
   it('update は対象を更新して entity を返す', async () => {
-    prisma.task.findFirst.mockResolvedValue(taskRow)
-    prisma.task.update.mockResolvedValue({ ...taskRow, status: 'done' })
+    prisma.task.updateMany.mockResolvedValue({ count: 1 })
+    prisma.task.findFirst.mockResolvedValue({ ...taskRow, status: 'done' })
     const repo = new PrismaTaskRepository(prisma as unknown as never)
     const result = await repo.update(
       't1',
@@ -140,33 +142,35 @@ describe('PrismaTaskRepository', () => {
       'u1',
     )
     expect(result?.status).toBe('done')
-    const data = prisma.task.update.mock.calls[0][0].data
+    const data = prisma.task.updateMany.mock.calls[0][0].data
     expect(data.status).toBe('done')
     expect(data.dueDate).toBeInstanceOf(Date)
+    // 多層防御: where に必ず userId を含む
+    expect(prisma.task.updateMany.mock.calls[0][0].where).toEqual({ id: 't1', userId: 'u1' })
   })
 
   it('update は dueDate=null も明示的に渡せる', async () => {
+    prisma.task.updateMany.mockResolvedValue({ count: 1 })
     prisma.task.findFirst.mockResolvedValue(taskRow)
-    prisma.task.update.mockResolvedValue(taskRow)
     const repo = new PrismaTaskRepository(prisma as unknown as never)
     await repo.update('t1', { dueDate: null }, 'u1')
-    expect(prisma.task.update.mock.calls[0][0].data.dueDate).toBeNull()
+    expect(prisma.task.updateMany.mock.calls[0][0].data.dueDate).toBeNull()
   })
 
   it('delete は存在しない id なら null', async () => {
     prisma.task.findFirst.mockResolvedValue(null)
     const repo = new PrismaTaskRepository(prisma as unknown as never)
     expect(await repo.delete('t1', 'u1')).toBeNull()
-    expect(prisma.task.delete).not.toHaveBeenCalled()
+    expect(prisma.task.deleteMany).not.toHaveBeenCalled()
   })
 
-  it('delete は対象を消して削除前の entity を返す', async () => {
+  it('delete は deleteMany(where userId) で消して削除前の entity を返す', async () => {
     prisma.task.findFirst.mockResolvedValue(taskRow)
-    prisma.task.delete.mockResolvedValue(undefined)
+    prisma.task.deleteMany = vi.fn().mockResolvedValue({ count: 1 })
     const repo = new PrismaTaskRepository(prisma as unknown as never)
     const result = await repo.delete('t1', 'u1')
     expect(result?.id).toBe('t1')
-    expect(prisma.task.delete).toHaveBeenCalledWith({ where: { id: 't1' } })
+    expect(prisma.task.deleteMany).toHaveBeenCalledWith({ where: { id: 't1', userId: 'u1' } })
   })
 })
 
