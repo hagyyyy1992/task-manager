@@ -14,6 +14,11 @@ describe('PasswordInput', () => {
     expect(input.type).toBe('password')
   })
 
+  it('label と input が htmlFor/id で紐付いている (a11y)', () => {
+    render(<PasswordInput value="" onChange={() => {}} label="現在のパスワード" />)
+    expect(screen.getByLabelText('現在のパスワード')).toBeInTheDocument()
+  })
+
   it('入力すると onChange が呼ばれる', () => {
     const onChange = vi.fn()
     render(<PasswordInput value="" onChange={onChange} label="L" />)
