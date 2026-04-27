@@ -59,6 +59,7 @@ beforeEach(() => {
       update: vi.fn(),
       upsert: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       aggregate: vi.fn(),
     },
     user: {
@@ -414,10 +415,27 @@ describe('PrismaUserRepository', () => {
     expect(await repo.delete('u1')).toBe(false)
   })
 
-  it('delete: 成功時は true', async () => {
+  it('delete: 関連 task/category も同一トランザクションで削除する', async () => {
     prisma.user.findUnique.mockResolvedValue(userRow)
-    prisma.user.delete.mockResolvedValue(userRow)
+    const ops: string[] = []
+    prisma.task.deleteMany = vi.fn(async () => {
+      ops.push('task.deleteMany')
+      return { count: 5 }
+    })
+    prisma.category.deleteMany = vi.fn(async () => {
+      ops.push('category.deleteMany')
+      return { count: 3 }
+    })
+    prisma.user.delete = vi.fn(async () => {
+      ops.push('user.delete')
+      return userRow
+    })
+    prisma.$transaction = vi.fn(async (calls: Promise<unknown>[]) => Promise.all(calls))
+
     const repo = new PrismaUserRepository(prisma as unknown as never)
     expect(await repo.delete('u1')).toBe(true)
+    expect(ops).toEqual(['task.deleteMany', 'category.deleteMany', 'user.delete'])
+    expect(prisma.task.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
+    expect(prisma.category.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
   })
 })

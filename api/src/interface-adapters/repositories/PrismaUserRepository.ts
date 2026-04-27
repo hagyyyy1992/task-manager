@@ -71,7 +71,13 @@ export class PrismaUserRepository implements UserRepository {
   async delete(id: string): Promise<boolean> {
     const existing = await this.prisma.user.findUnique({ where: { id } })
     if (!existing) return false
-    await this.prisma.user.delete({ where: { id } })
+    // ON DELETE CASCADE のスキーマ設定に依存せず、関連データを明示的に同一トランザクションで削除する
+    // (個人情報削除責任をアプリ層で明示し、孤児レコード残存を防止)
+    await this.prisma.$transaction([
+      this.prisma.task.deleteMany({ where: { userId: id } }),
+      this.prisma.category.deleteMany({ where: { userId: id } }),
+      this.prisma.user.delete({ where: { id } }),
+    ])
     return true
   }
 }
