@@ -138,14 +138,12 @@ describe('UpdateCategoryInteractor', () => {
 
   it('Prisma P2002 (target=name) → duplicate', async () => {
     const repo = makeRepo({
-      update: vi
-        .fn()
-        .mockRejectedValue(
-          Object.assign(new Error('Unique'), {
-            code: 'P2002',
-            meta: { target: ['userId', 'name'] },
-          }),
-        ),
+      update: vi.fn().mockRejectedValue(
+        Object.assign(new Error('Unique'), {
+          code: 'P2002',
+          meta: { target: ['userId', 'name'] },
+        }),
+      ),
     })
     const result = await new UpdateCategoryInteractor(repo).execute({
       userId: 'u1',
@@ -304,5 +302,14 @@ describe('ReorderCategoriesInteractor', () => {
     })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('invalid_input')
+  })
+
+  it('ids が上限 (200) 超なら invalid_input', async () => {
+    const repo = makeRepo()
+    const ids = Array.from({ length: 201 }, (_, i) => `c${i}`)
+    const result = await new ReorderCategoriesInteractor(repo).execute({ userId: 'u1', ids })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('limit')
+    expect(repo.reorder).not.toHaveBeenCalled()
   })
 })

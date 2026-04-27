@@ -137,9 +137,11 @@ export class PrismaCategoryRepository implements CategoryRepository {
         if (seen.has(id)) throw new CategoryReorderError('重複したカテゴリIDが含まれています')
         seen.add(id)
       }
-      for (let i = 0; i < orderedIds.length; i++) {
-        await tx.category.update({ where: { id: orderedIds[i] }, data: { sortOrder: i } })
-      }
+      // N 個のカテゴリで N 回のラウンドトリップが発生するが、トランザクション内で
+      // 並列実行することで長時間ロックを掴む DoS 余地を抑える
+      await Promise.all(
+        orderedIds.map((id, i) => tx.category.update({ where: { id }, data: { sortOrder: i } })),
+      )
       return tx.category.findMany({ where: { userId }, orderBy: { sortOrder: 'asc' } })
     })
     return rows.map(toEntity)
