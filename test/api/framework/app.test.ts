@@ -532,6 +532,17 @@ describe('POST /api/categories', () => {
     expect(res.status).toBe(400)
     expect((await res.json()).error).toContain('name is required')
   })
+
+  it('returns 409 when duplicate', async () => {
+    vi.mocked(container.createCategory.execute).mockResolvedValue({
+      ok: false,
+      reason: 'duplicate',
+      message: '同じ名前のカテゴリが既に存在します',
+    })
+    const res = await req('/api/categories', { method: 'POST', body: { name: '重複' } })
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toContain('既に存在します')
+  })
 })
 
 describe('PATCH /api/categories/:id', () => {

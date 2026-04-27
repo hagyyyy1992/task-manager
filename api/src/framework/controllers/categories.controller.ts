@@ -29,7 +29,8 @@ export function createCategoriesController(container: Container) {
       sortOrder: body.sortOrder,
     })
     if (result.ok) return c.json(result.category, 201)
-    return c.json({ error: result.message }, 400)
+    const status = result.reason === 'duplicate' ? 409 : 400
+    return c.json({ error: result.message }, status)
   })
 
   app.patch('/:id', async (c) => {

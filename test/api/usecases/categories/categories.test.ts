@@ -94,6 +94,55 @@ describe('CreateCategoryInteractor', () => {
     expect(result.ok).toBe(false)
     expect(repo.create).not.toHaveBeenCalled()
   })
+
+  it('CategoryDuplicateError → duplicate', async () => {
+    const repo = makeRepo({
+      create: vi.fn().mockRejectedValue(new CategoryDuplicateError()),
+    })
+    const result = await new CreateCategoryInteractor(repo).execute({
+      userId: 'u1',
+      name: '重複',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('duplicate')
+  })
+
+  it('Prisma P2002 (target=name) → duplicate', async () => {
+    const repo = makeRepo({
+      create: vi.fn().mockRejectedValue(
+        Object.assign(new Error('Unique'), {
+          code: 'P2002',
+          meta: { target: ['userId', 'name'] },
+        }),
+      ),
+    })
+    const result = await new CreateCategoryInteractor(repo).execute({
+      userId: 'u1',
+      name: '重複',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('duplicate')
+  })
+
+  it('Prisma P2002 (他カラム) は再 throw', async () => {
+    const repo = makeRepo({
+      create: vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error('Unique'), { code: 'P2002', meta: { target: ['other'] } }),
+        ),
+    })
+    await expect(
+      new CreateCategoryInteractor(repo).execute({ userId: 'u1', name: 'x' }),
+    ).rejects.toThrow('Unique')
+  })
+
+  it('未知の例外は再 throw', async () => {
+    const repo = makeRepo({ create: vi.fn().mockRejectedValue(new Error('boom')) })
+    await expect(
+      new CreateCategoryInteractor(repo).execute({ userId: 'u1', name: 'x' }),
+    ).rejects.toThrow('boom')
+  })
 })
 
 describe('UpdateCategoryInteractor', () => {

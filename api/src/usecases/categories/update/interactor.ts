@@ -4,23 +4,11 @@ import { CategoryDuplicateError } from '../../../domain/exceptions/CategoryDupli
 import type { UpdateCategoryInput, UpdateCategoryUseCase } from './input-port.js'
 import type { UpdateCategoryOutput } from './output-port.js'
 import { CATEGORY_NAME_MAX } from '../validators.js'
+import { CATEGORY_DUPLICATE_MESSAGE, isPrismaUniqueViolationOnName } from '../duplicate-error.js'
 
 function isValidSortOrder(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
 }
-
-function isPrismaUniqueViolationOnName(e: unknown): boolean {
-  if (!e || typeof e !== 'object') return false
-  const err = e as { code?: unknown; meta?: { target?: unknown } }
-  if (err.code !== 'P2002') return false
-  const target = err.meta?.target
-  if (Array.isArray(target)) return target.includes('name')
-  if (typeof target === 'string') return target.includes('name')
-  // target が無いケースは安全側で true（Category の唯一の unique 制約は (userId, name)）
-  return target === undefined
-}
-
-const DUPLICATE_MESSAGE = '同じ名前のカテゴリが既に存在します'
 
 export class UpdateCategoryInteractor implements UpdateCategoryUseCase {
   constructor(private readonly categories: CategoryRepository) {}
@@ -57,7 +45,7 @@ export class UpdateCategoryInteractor implements UpdateCategoryUseCase {
         return { ok: false, reason: 'protected', message: e.message }
       }
       if (e instanceof CategoryDuplicateError || isPrismaUniqueViolationOnName(e)) {
-        return { ok: false, reason: 'duplicate', message: DUPLICATE_MESSAGE }
+        return { ok: false, reason: 'duplicate', message: CATEGORY_DUPLICATE_MESSAGE }
       }
       throw e
     }

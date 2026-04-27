@@ -1,7 +1,9 @@
 import type { CategoryRepository } from '../../../domain/repositories/CategoryRepository.js'
+import { CategoryDuplicateError } from '../../../domain/exceptions/CategoryDuplicateError.js'
 import type { CreateCategoryInput, CreateCategoryUseCase } from './input-port.js'
 import type { CreateCategoryOutput } from './output-port.js'
 import { CATEGORY_NAME_MAX } from '../validators.js'
+import { CATEGORY_DUPLICATE_MESSAGE, isPrismaUniqueViolationOnName } from '../duplicate-error.js'
 
 function isValidSortOrder(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
@@ -26,7 +28,14 @@ export class CreateCategoryInteractor implements CreateCategoryUseCase {
     if (input.sortOrder !== undefined && !isValidSortOrder(input.sortOrder)) {
       return { ok: false, reason: 'invalid_input', message: 'invalid sortOrder' }
     }
-    const category = await this.categories.create(input.userId, trimmed, input.sortOrder)
-    return { ok: true, category }
+    try {
+      const category = await this.categories.create(input.userId, trimmed, input.sortOrder)
+      return { ok: true, category }
+    } catch (e) {
+      if (e instanceof CategoryDuplicateError || isPrismaUniqueViolationOnName(e)) {
+        return { ok: false, reason: 'duplicate', message: CATEGORY_DUPLICATE_MESSAGE }
+      }
+      throw e
+    }
   }
 }
