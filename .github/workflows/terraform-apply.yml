@@ -39,7 +39,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        # macOS 上で生成された lockfile に Linux 用 optional deps (@emnapi/* 等) が
+        # 欠落しているケースに備え、npm ci 失敗時は npm install にフォールバック。
+        # deploy.yml と同じ扱い (lockfile drift は CI の警告で気付ける)。
+        run: npm ci || npm install --no-save
 
       - name: Generate Prisma Client
         run: npx prisma generate
