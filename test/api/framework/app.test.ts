@@ -42,7 +42,7 @@ function makeContainer(): Container {
   const tokens: TokenService = {
     issue: vi.fn().mockResolvedValue('test-token'),
     issueLongLived: vi.fn().mockResolvedValue('test-long-token'),
-    verify: vi.fn().mockResolvedValue('user123'),
+    verify: vi.fn().mockResolvedValue({ userId: 'user123', scope: 'session' }),
   }
 
   const usecase = <T = unknown>(execute: T) => ({ execute })
@@ -169,6 +169,13 @@ describe('auth middleware', () => {
     const res = await req('/api/tasks')
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('invalid or expired token')
+  })
+
+  it('returns 403 when MCP token is used against UI endpoints', async () => {
+    vi.mocked(container.tokens.verify).mockResolvedValue({ userId: 'user123', scope: 'mcp' })
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toBe('token scope not allowed for this endpoint')
   })
 })
 

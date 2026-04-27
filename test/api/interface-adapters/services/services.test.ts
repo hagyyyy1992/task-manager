@@ -25,14 +25,14 @@ describe('JoseTokenService', () => {
     expect(() => new JoseTokenService('')).toThrow()
   })
 
-  it('issue → verify でユーザーID復元', async () => {
+  it('issue → verify で userId と scope=session を復元', async () => {
     const token = await svc.issue('user-1')
-    expect(await svc.verify(token)).toBe('user-1')
+    expect(await svc.verify(token)).toEqual({ userId: 'user-1', scope: 'session' })
   })
 
-  it('issueLongLived も verify で復元できる', async () => {
+  it('issueLongLived は scope=mcp を返す', async () => {
     const token = await svc.issueLongLived('user-1')
-    expect(await svc.verify(token)).toBe('user-1')
+    expect(await svc.verify(token)).toEqual({ userId: 'user-1', scope: 'mcp' })
   })
 
   it('改竄/不正トークンは null', async () => {

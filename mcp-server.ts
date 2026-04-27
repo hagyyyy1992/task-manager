@@ -20,12 +20,15 @@ const categoryRepo = new PrismaCategoryRepository(prisma)
 const userRepo = new PrismaUserRepository(prisma)
 const tokens = new JoseTokenService(process.env.JWT_SECRET ?? '')
 
-const userId = await tokens.verify(token)
-if (!userId) {
+const verified = await tokens.verify(token)
+if (!verified) {
   throw new Error('TASK_APP_TOKEN is invalid or expired')
 }
+if (verified.scope !== 'mcp') {
+  throw new Error('TASK_APP_TOKEN の scope が mcp ではありません')
+}
 
-const currentUser = await userRepo.findById(userId)
+const currentUser = await userRepo.findById(verified.userId)
 if (!currentUser) {
   throw new Error('TASK_APP_TOKEN のユーザーが DB に存在しません')
 }
