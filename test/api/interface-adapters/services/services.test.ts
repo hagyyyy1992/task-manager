@@ -47,14 +47,36 @@ describe('JoseTokenService', () => {
     expect(verified?.issuedAt).toBeLessThanOrEqual(before + 1)
   })
 
-  it('issueLongLived は scope=mcp と iat を返す', async () => {
+  it('issueLongLived は scope=mcp / iat / 渡した jti を返す', async () => {
     const before = Math.floor(Date.now() / 1000)
-    const token = await svc.issueLongLived('user-1')
+    const token = await svc.issueLongLived('user-1', 'jti-xyz')
     const verified = await svc.verify(token)
     expect(verified?.userId).toBe('user-1')
     expect(verified?.scope).toBe('mcp')
     expect(verified?.issuedAt).toBeGreaterThanOrEqual(before)
     expect(verified?.issuedAt).toBeLessThanOrEqual(before + 1)
+    expect(verified?.jti).toBe('jti-xyz')
+  })
+
+  // issue #37 以前に発行された旧 mcp トークン (jti claim 無し) との互換性確認。
+  // verify は jti=null を返し、middleware 側で 401 拒否される (再発行を強制する設計)。
+  it('jti claim 無しの mcp トークンは verify で jti=null', async () => {
+    // setJti を呼ばないだけの旧実装と同等の token を作る (svc と同じシークレットで署名)
+    const { SignJWT } = await import('jose')
+    const secret = new TextEncoder().encode('test-secret-test-secret')
+    const legacy = await new SignJWT({ sub: 'user-1', scope: 'mcp' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('365d')
+      .sign(secret)
+    const verified = await svc.verify(legacy)
+    expect(verified?.jti).toBeNull()
+  })
+
+  it('session トークンは jti=null', async () => {
+    const token = await svc.issue('user-1')
+    const verified = await svc.verify(token)
+    expect(verified?.jti).toBeNull()
   })
 
   it('改竄/不正トークンは null', async () => {

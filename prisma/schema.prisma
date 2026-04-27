@@ -18,8 +18,27 @@ model User {
   updatedAt       DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
   tasks           Task[]
   categories      Category[]
+  tokens          Token[]
 
   @@map("users")
+}
+
+// MCP 等の長期トークン (issueLongLived) 個別失効のためのレコード。
+// JWT に jti claim を埋め、verify 時に DB の revokedAt を突き合わせる (issue #37)。
+// session トークン (短期) は追跡しない。
+model Token {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  scope      String
+  jti        String    @unique
+  label      String    @default("")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("tokens")
 }
 
 model Task {

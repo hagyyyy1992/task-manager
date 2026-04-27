@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PrismaTaskRepository } from '@api/interface-adapters/repositories/PrismaTaskRepository.js'
 import { PrismaCategoryRepository } from '@api/interface-adapters/repositories/PrismaCategoryRepository.js'
 import { PrismaUserRepository } from '@api/interface-adapters/repositories/PrismaUserRepository.js'
+import { PrismaTokenRepository } from '@api/interface-adapters/repositories/PrismaTokenRepository.js'
 import { CategoryProtectedError } from '@api/domain/exceptions/CategoryProtectedError.js'
 import { CategoryDuplicateError } from '@api/domain/exceptions/CategoryDuplicateError.js'
 import { FALLBACK_CATEGORY_NAME, DEFAULT_CATEGORIES } from '@api/domain/entities/Category.js'
@@ -36,6 +37,7 @@ interface FakePrisma {
   task: Record<string, ReturnType<typeof vi.fn>>
   category: Record<string, ReturnType<typeof vi.fn>>
   user: Record<string, ReturnType<typeof vi.fn>>
+  token: Record<string, ReturnType<typeof vi.fn>>
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -68,6 +70,13 @@ beforeEach(() => {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+    },
+    token: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
   }
@@ -521,5 +530,87 @@ describe('PrismaUserRepository', () => {
     expect(ops).toEqual(['task.deleteMany', 'category.deleteMany', 'user.delete'])
     expect(prisma.task.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
     expect(prisma.category.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
+  })
+})
+
+// ─── PrismaTokenRepository (issue #37) ───────────────────────────
+
+const tokenRow = {
+  id: 'tok-1',
+  userId: 'u1',
+  scope: 'mcp',
+  jti: 'jti-1',
+  label: 'macbook',
+  createdAt: baseDate,
+  lastUsedAt: null as Date | null,
+  revokedAt: null as Date | null,
+}
+
+describe('PrismaTokenRepository', () => {
+  it('create: 渡した値をそのまま INSERT して entity を返す', async () => {
+    prisma.token.create.mockResolvedValue(tokenRow)
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    const result = await repo.create({
+      id: 'tok-1',
+      userId: 'u1',
+      scope: 'mcp',
+      jti: 'jti-1',
+      label: 'macbook',
+    })
+    expect(prisma.token.create).toHaveBeenCalledWith({
+      data: { id: 'tok-1', userId: 'u1', scope: 'mcp', jti: 'jti-1', label: 'macbook' },
+    })
+    expect(result.scope).toBe('mcp')
+    expect(result.revokedAt).toBeNull()
+  })
+
+  it('findByJti: 該当行を entity として返す', async () => {
+    prisma.token.findUnique.mockResolvedValue(tokenRow)
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    const result = await repo.findByJti('jti-1')
+    expect(prisma.token.findUnique).toHaveBeenCalledWith({ where: { jti: 'jti-1' } })
+    expect(result?.id).toBe('tok-1')
+  })
+
+  it('findByJti: 不在なら null', async () => {
+    prisma.token.findUnique.mockResolvedValue(null)
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    expect(await repo.findByJti('jti-x')).toBeNull()
+  })
+
+  it('listActiveByUser: revoked を除外して createdAt 降順で取得', async () => {
+    prisma.token.findMany.mockResolvedValue([tokenRow])
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    await repo.listActiveByUser('u1')
+    expect(prisma.token.findMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+    })
+  })
+
+  it('revoke: 多層防御として where に userId と revokedAt:null を含めて updateMany', async () => {
+    prisma.token.updateMany.mockResolvedValue({ count: 1 })
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    expect(await repo.revoke('tok-1', 'u1')).toBe(true)
+    const args = prisma.token.updateMany.mock.calls[0][0]
+    expect(args.where).toEqual({ id: 'tok-1', userId: 'u1', revokedAt: null })
+    expect(args.data.revokedAt).toBeInstanceOf(Date)
+  })
+
+  it('revoke: 該当 0 件は false (他ユーザーの id / 既 revoke / 不在)', async () => {
+    prisma.token.updateMany.mockResolvedValue({ count: 0 })
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    expect(await repo.revoke('tok-x', 'u1')).toBe(false)
+  })
+
+  it('touchLastUsed: 例外を投げず updateMany のみ呼ぶ', async () => {
+    prisma.token.updateMany.mockResolvedValue({ count: 1 })
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    const at = new Date('2026-04-27T12:34:56.000Z')
+    await repo.touchLastUsed('jti-1', at)
+    expect(prisma.token.updateMany).toHaveBeenCalledWith({
+      where: { jti: 'jti-1' },
+      data: { lastUsedAt: at },
+    })
   })
 })

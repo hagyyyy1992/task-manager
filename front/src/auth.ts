@@ -110,3 +110,41 @@ export async function deleteAccount(currentPassword: string): Promise<void> {
   }
   clearToken()
 }
+
+// ─── MCP token 管理 (issue #37) ────────────────────────────────
+
+export interface McpToken {
+  id: string
+  label: string
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+export async function listMcpTokens(): Promise<McpToken[]> {
+  const res = await fetch(`${API}/mcp-tokens`, { headers: authHeaders() })
+  if (!res.ok) throw new Error(`Failed to load MCP tokens: ${res.status}`)
+  const body = (await res.json()) as { tokens: McpToken[] }
+  return body.tokens
+}
+
+// 生成された JWT は **このレスポンスでしか取得できない**。UI はその場で表示してコピーさせる。
+export async function issueMcpToken(label: string): Promise<{ token: string; tokenId: string }> {
+  const res = await fetch(`${API}/mcp-tokens`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ label }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `Failed to issue MCP token: ${res.status}`)
+  }
+  return await res.json()
+}
+
+export async function revokeMcpToken(id: string): Promise<void> {
+  const res = await fetch(`${API}/mcp-tokens/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(`Failed to revoke MCP token: ${res.status}`)
+}

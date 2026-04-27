@@ -38,7 +38,10 @@ export function createAuthController(container: Container) {
 
   // protected
   const protectedRoutes = new Hono<AuthEnv>()
-  protectedRoutes.use('*', createAuthMiddleware(container.tokens, container.users))
+  protectedRoutes.use(
+    '*',
+    createAuthMiddleware(container.tokens, container.users, container.tokenRepo),
+  )
 
   protectedRoutes.get('/me', async (c) => {
     const result = await container.me.execute(c.get('userId'))
@@ -80,6 +83,43 @@ export function createAuthController(container: Container) {
     const status =
       result.reason === 'invalid_input' ? 400 : result.reason === 'wrong_password' ? 401 : 404
     return c.json({ error: result.message ?? 'user not found' }, status)
+  })
+
+  // MCP トークン管理 (issue #37)
+  protectedRoutes.get('/mcp-tokens', async (c) => {
+    const result = await container.listMcpTokens.execute(c.get('userId'))
+    // jti と userId は内部識別子なのでレスポンスに含めない
+    const tokens = result.tokens.map((t) => ({
+      id: t.id,
+      label: t.label,
+      createdAt: t.createdAt,
+      lastUsedAt: t.lastUsedAt,
+    }))
+    return c.json({ tokens }, 200)
+  })
+
+  protectedRoutes.post('/mcp-tokens', async (c) => {
+    let body: { label?: string } = {}
+    try {
+      body = await c.req.json<{ label?: string }>()
+    } catch {
+      // body 不在 / 不正 JSON は middleware で 400 済み or 空オブジェクト扱い
+    }
+    const result = await container.issueMcpToken.execute({
+      userId: c.get('userId'),
+      label: body.label,
+    })
+    if (result.ok) return c.json({ token: result.token, tokenId: result.tokenId }, 201)
+    return c.json({ error: result.message }, 400)
+  })
+
+  protectedRoutes.delete('/mcp-tokens/:id', async (c) => {
+    const result = await container.revokeMcpToken.execute({
+      userId: c.get('userId'),
+      tokenId: c.req.param('id'),
+    })
+    if (result.ok) return c.json({ message: 'token revoked' }, 200)
+    return c.json({ error: 'token not found' }, 404)
   })
 
   app.route('/', protectedRoutes)

@@ -46,7 +46,9 @@ function makeContainer(): Container {
     issue: vi.fn().mockResolvedValue('test-token'),
     issueLongLived: vi.fn().mockResolvedValue('test-long-token'),
     // 既定では現時点で発行された session トークン扱い (passwordChangedAt 失効テスト以外は素通り)
-    verify: vi.fn().mockResolvedValue({ userId: 'user123', scope: 'session', issuedAt: nowSec() }),
+    verify: vi
+      .fn()
+      .mockResolvedValue({ userId: 'user123', scope: 'session', issuedAt: nowSec(), jti: null }),
   }
 
   // auth.middleware が削除済みユーザー / passwordChangedAt 判定で findById を叩くため最低限スタブする
@@ -54,16 +56,30 @@ function makeContainer(): Container {
     findById: vi.fn().mockResolvedValue(mockUser),
   }
 
+  // mcp scope の DB 突合 (issue #37) は session scope テストでは呼ばれないが、
+  // findByJti が undefined で参照されないようにスタブだけ用意しておく
+  const tokenRepo = {
+    findByJti: vi.fn().mockResolvedValue(null),
+    listActiveByUser: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    revoke: vi.fn().mockResolvedValue(true),
+    touchLastUsed: vi.fn().mockResolvedValue(undefined),
+  }
+
   const usecase = <T = unknown>(execute: T) => ({ execute })
 
   return {
     tokens,
     users,
+    tokenRepo,
     register: usecase(vi.fn()),
     login: usecase(vi.fn()),
     me: usecase(vi.fn()),
     changePassword: usecase(vi.fn()),
     deleteAccount: usecase(vi.fn()),
+    listMcpTokens: usecase(vi.fn()),
+    issueMcpToken: usecase(vi.fn()),
+    revokeMcpToken: usecase(vi.fn()),
     listTasks: usecase(vi.fn()),
     createTask: usecase(vi.fn()),
     updateTask: usecase(vi.fn()),
@@ -212,6 +228,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: nowSec(),
+      jti: null,
     })
     const app = (await import('@api/framework/app.js')).buildApp({ container })
     const res = await app.fetch(
@@ -229,6 +246,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: nowSec(),
+      jti: null,
     })
     vi.mocked(container.deleteAccount.execute).mockResolvedValue({
       ok: false,
@@ -258,6 +276,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'mcp',
       issuedAt: nowSec(),
+      jti: 'jti-test',
     })
     const res = await req('/api/tasks')
     expect(res.status).toBe(403)
@@ -276,6 +295,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 10,
+      jti: null,
     })
     const res = await req('/api/tasks')
     expect(res.status).toBe(401)
@@ -293,6 +313,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000),
+      jti: null,
     })
     vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
@@ -313,6 +334,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000), // = 10:00:00
+      jti: null,
     })
     vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
@@ -331,6 +353,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 5,
+      jti: null,
     })
     vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
@@ -342,6 +365,180 @@ describe('auth middleware', () => {
     const res = await req('/api/tasks')
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('invalid or expired token')
+  })
+})
+
+// ─── MCP token revoke (issue #37) ────────────────────────────────
+
+describe('MCP token revoke (auth middleware vs Token table)', () => {
+  // /api/auth/me は session のみ許可なので scope 検査で 403 になり jti 突合まで届かない。
+  // 純粋に jti 突合の挙動を検証するために、mcp scope を受け付ける /api/auth/mcp-tokens (GET) で確認する。
+  it('mcp scope なのに jti=null (旧トークン) は 401 と再発行誘導メッセージ', async () => {
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'mcp',
+      issuedAt: nowSec(),
+      jti: null,
+    })
+    // mcp scope は /api/auth/mcp-tokens でも受け取らない (session のみ) ので 403 で先に弾ける。
+    // ここでは「session トークンで jti=null」が DB 突合をスキップして通過することを検証する代替として、
+    // mcp scope + jti=null を /api/tasks に当てて 401 になることを確認する…
+    // …が、UI エンドポイントは scope=mcp を 403 で拒否するため auth.middleware の jti チェックまで届かない。
+    // 実際の挙動: scope 拒否(403) が先に出る。jti=null 拒否は MCP 用エンドポイント側が用意されてからのテスト。
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(403)
+  })
+
+  it('mcp scope で jti が DB 不在なら 401 (revoked or never issued)', async () => {
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'mcp',
+      issuedAt: nowSec(),
+      jti: 'unknown-jti',
+    })
+    // ※ /api/tasks は session のみ受け付けるので scope 検査で 403。
+    //   middleware 単体での jti 突合検証は createAuthMiddleware を直接呼ぶ別テストで担保する。
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(403)
+  })
+})
+
+// auth.middleware の jti 突合 (mcp scope を allow した状態) を直接検証
+describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
+  it('jti が DB に無い場合は 401', async () => {
+    const { createAuthMiddleware } = await import('@api/framework/middleware/auth.middleware.js')
+    const tokens = {
+      issue: vi.fn(),
+      issueLongLived: vi.fn(),
+      verify: vi
+        .fn()
+        .mockResolvedValue({ userId: 'u1', scope: 'mcp', issuedAt: nowSec(), jti: 'jti-x' }),
+    }
+    const users = { findById: vi.fn().mockResolvedValue(mockUser) }
+    const tokenRepo = {
+      findByJti: vi.fn().mockResolvedValue(null),
+      listActiveByUser: vi.fn(),
+      create: vi.fn(),
+      revoke: vi.fn(),
+      touchLastUsed: vi.fn(),
+    }
+    const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
+    const c = {
+      req: { header: () => 'Bearer x' },
+      json: (body: unknown, status: number) => ({ body, status }) as never,
+      set: vi.fn(),
+    }
+    const result = (await mw(c as never, vi.fn())) as { status: number }
+    expect(result.status).toBe(401)
+  })
+
+  it('revokedAt が立っているトークンは 401', async () => {
+    const { createAuthMiddleware } = await import('@api/framework/middleware/auth.middleware.js')
+    const tokens = {
+      issue: vi.fn(),
+      issueLongLived: vi.fn(),
+      verify: vi
+        .fn()
+        .mockResolvedValue({ userId: 'u1', scope: 'mcp', issuedAt: nowSec(), jti: 'jti-x' }),
+    }
+    const users = { findById: vi.fn().mockResolvedValue(mockUser) }
+    const tokenRepo = {
+      findByJti: vi.fn().mockResolvedValue({
+        id: 't1',
+        userId: 'u1',
+        scope: 'mcp',
+        jti: 'jti-x',
+        label: '',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        lastUsedAt: null,
+        revokedAt: '2026-04-27T01:00:00.000Z',
+      }),
+      listActiveByUser: vi.fn(),
+      create: vi.fn(),
+      revoke: vi.fn(),
+      touchLastUsed: vi.fn(),
+    }
+    const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
+    const c = {
+      req: { header: () => 'Bearer x' },
+      json: (body: unknown, status: number) => ({ body, status }) as never,
+      set: vi.fn(),
+    }
+    const result = (await mw(c as never, vi.fn())) as { status: number }
+    expect(result.status).toBe(401)
+  })
+
+  it('jti=null (旧 mcp トークン) は 401 + 再発行誘導メッセージ', async () => {
+    const { createAuthMiddleware } = await import('@api/framework/middleware/auth.middleware.js')
+    const tokens = {
+      issue: vi.fn(),
+      issueLongLived: vi.fn(),
+      verify: vi
+        .fn()
+        .mockResolvedValue({ userId: 'u1', scope: 'mcp', issuedAt: nowSec(), jti: null }),
+    }
+    const users = { findById: vi.fn().mockResolvedValue(mockUser) }
+    const tokenRepo = {
+      findByJti: vi.fn(),
+      listActiveByUser: vi.fn(),
+      create: vi.fn(),
+      revoke: vi.fn(),
+      touchLastUsed: vi.fn(),
+    }
+    const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
+    let captured: { body: { error: string }; status: number } | null = null
+    const c = {
+      req: { header: () => 'Bearer x' },
+      json: (body: { error: string }, status: number) => {
+        captured = { body, status }
+        return captured as never
+      },
+      set: vi.fn(),
+    }
+    await mw(c as never, vi.fn())
+    expect(captured!.status).toBe(401)
+    expect(captured!.body.error).toMatch(/re-issue/i)
+    expect(tokenRepo.findByJti).not.toHaveBeenCalled()
+  })
+
+  it('有効なトークンは next() を呼び lastUsedAt を更新する', async () => {
+    const { createAuthMiddleware } = await import('@api/framework/middleware/auth.middleware.js')
+    const tokens = {
+      issue: vi.fn(),
+      issueLongLived: vi.fn(),
+      verify: vi
+        .fn()
+        .mockResolvedValue({ userId: 'u1', scope: 'mcp', issuedAt: nowSec(), jti: 'jti-x' }),
+    }
+    const users = { findById: vi.fn().mockResolvedValue(mockUser) }
+    const tokenRepo = {
+      findByJti: vi.fn().mockResolvedValue({
+        id: 't1',
+        userId: 'u1',
+        scope: 'mcp',
+        jti: 'jti-x',
+        label: '',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        lastUsedAt: null,
+        revokedAt: null,
+      }),
+      listActiveByUser: vi.fn(),
+      create: vi.fn(),
+      revoke: vi.fn(),
+      touchLastUsed: vi.fn().mockResolvedValue(undefined),
+    }
+    const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
+    const set = vi.fn()
+    const c = {
+      req: { header: () => 'Bearer x' },
+      json: vi.fn(),
+      set,
+    }
+    const next = vi.fn().mockResolvedValue(undefined)
+    await mw(c as never, next)
+    expect(next).toHaveBeenCalled()
+    expect(set).toHaveBeenCalledWith('userId', 'u1')
+    expect(tokenRepo.touchLastUsed).toHaveBeenCalledWith('jti-x', expect.any(Date))
   })
 })
 

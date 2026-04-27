@@ -3,6 +3,7 @@ import { createPrismaClient, type PrismaClient } from '../prisma/client.js'
 import { PrismaTaskRepository } from '../../interface-adapters/repositories/PrismaTaskRepository.js'
 import { PrismaCategoryRepository } from '../../interface-adapters/repositories/PrismaCategoryRepository.js'
 import { PrismaUserRepository } from '../../interface-adapters/repositories/PrismaUserRepository.js'
+import { PrismaTokenRepository } from '../../interface-adapters/repositories/PrismaTokenRepository.js'
 import { ScryptPasswordHashService } from '../../interface-adapters/services/ScryptPasswordHashService.js'
 import { JoseTokenService } from '../../interface-adapters/services/JoseTokenService.js'
 
@@ -11,6 +12,9 @@ import { LoginInteractor } from '../../usecases/auth/login/interactor.js'
 import { MeInteractor } from '../../usecases/auth/me/interactor.js'
 import { ChangePasswordInteractor } from '../../usecases/auth/change-password/interactor.js'
 import { DeleteAccountInteractor } from '../../usecases/auth/delete-account/interactor.js'
+import { ListMcpTokensInteractor } from '../../usecases/auth/list-mcp-tokens/interactor.js'
+import { IssueMcpTokenInteractor } from '../../usecases/auth/issue-mcp-token/interactor.js'
+import { RevokeMcpTokenInteractor } from '../../usecases/auth/revoke-mcp-token/interactor.js'
 
 import { ListTasksInteractor } from '../../usecases/tasks/list/interactor.js'
 import { CreateTaskInteractor } from '../../usecases/tasks/create/interactor.js'
@@ -25,11 +29,15 @@ import { ReorderCategoriesInteractor } from '../../usecases/categories/reorder/i
 
 import type { TokenService } from '../../domain/services/TokenService.js'
 import type { UserRepository } from '../../domain/repositories/UserRepository.js'
+import type { TokenRepository } from '../../domain/repositories/TokenRepository.js'
 import type { RegisterUseCase } from '../../usecases/auth/register/input-port.js'
 import type { LoginUseCase } from '../../usecases/auth/login/input-port.js'
 import type { MeUseCase } from '../../usecases/auth/me/input-port.js'
 import type { ChangePasswordUseCase } from '../../usecases/auth/change-password/input-port.js'
 import type { DeleteAccountUseCase } from '../../usecases/auth/delete-account/input-port.js'
+import type { ListMcpTokensUseCase } from '../../usecases/auth/list-mcp-tokens/input-port.js'
+import type { IssueMcpTokenUseCase } from '../../usecases/auth/issue-mcp-token/input-port.js'
+import type { RevokeMcpTokenUseCase } from '../../usecases/auth/revoke-mcp-token/input-port.js'
 import type { ListTasksUseCase } from '../../usecases/tasks/list/input-port.js'
 import type { CreateTaskUseCase } from '../../usecases/tasks/create/input-port.js'
 import type { UpdateTaskUseCase } from '../../usecases/tasks/update/input-port.js'
@@ -44,11 +52,16 @@ export interface Container {
   tokens: TokenService
   // auth.middleware が JWT 失効判定 (passwordChangedAt vs iat) で利用 (issue #36)
   users: UserRepository
+  // auth.middleware が mcp トークンの DB 突合に使う (issue #37)
+  tokenRepo: TokenRepository
   register: RegisterUseCase
   login: LoginUseCase
   me: MeUseCase
   changePassword: ChangePasswordUseCase
   deleteAccount: DeleteAccountUseCase
+  listMcpTokens: ListMcpTokensUseCase
+  issueMcpToken: IssueMcpTokenUseCase
+  revokeMcpToken: RevokeMcpTokenUseCase
   listTasks: ListTasksUseCase
   createTask: CreateTaskUseCase
   updateTask: UpdateTaskUseCase
@@ -63,6 +76,7 @@ export interface Container {
 export interface ContainerOverrides {
   prisma?: PrismaClient
   tokens?: TokenService
+  tokenRepo?: TokenRepository
 }
 
 export function createContainer(overrides: ContainerOverrides = {}): Container {
@@ -71,6 +85,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   const taskRepo = new PrismaTaskRepository(prisma)
   const categoryRepo = new PrismaCategoryRepository(prisma)
   const userRepo = new PrismaUserRepository(prisma)
+  const tokenRepo = overrides.tokenRepo ?? new PrismaTokenRepository(prisma)
   const passwords = new ScryptPasswordHashService()
   let tokens: TokenService
   if (overrides.tokens) {
@@ -86,6 +101,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   return {
     tokens,
     users: userRepo,
+    tokenRepo,
     register: new RegisterInteractor(
       userRepo,
       categoryRepo,
@@ -97,6 +113,9 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     me: new MeInteractor(userRepo),
     changePassword: new ChangePasswordInteractor(userRepo, passwords),
     deleteAccount: new DeleteAccountInteractor(userRepo, passwords),
+    listMcpTokens: new ListMcpTokensInteractor(tokenRepo),
+    issueMcpToken: new IssueMcpTokenInteractor(tokens, tokenRepo),
+    revokeMcpToken: new RevokeMcpTokenInteractor(tokenRepo),
     listTasks: new ListTasksInteractor(taskRepo),
     createTask: new CreateTaskInteractor(taskRepo),
     updateTask: new UpdateTaskInteractor(taskRepo),

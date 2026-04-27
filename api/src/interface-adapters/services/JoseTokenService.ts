@@ -17,12 +17,14 @@ export class JoseTokenService implements TokenService {
       .sign(this.secret)
   }
 
-  // MCP 等の長期利用クライアント向け（1年）。UI 経由の通常ログインでは使わない
-  async issueLongLived(userId: string): Promise<string> {
+  // MCP 等の長期利用クライアント向け（1年）。UI 経由の通常ログインでは使わない。
+  // jti は呼び出し側で生成して渡し、DB の Token テーブルと突合可能にする (issue #37)。
+  async issueLongLived(userId: string, jti: string): Promise<string> {
     return new SignJWT({ sub: userId, scope: 'mcp' satisfies TokenScope })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('365d')
+      .setJti(jti)
       .sign(this.secret)
   }
 
@@ -38,7 +40,10 @@ export class JoseTokenService implements TokenService {
       // iat 欠落は設計上ありえない (issue/issueLongLived は必ず setIssuedAt を呼ぶ) が、
       // 念のため 0 を返すと middleware 側で「変更日時より昔」と判定 → 失効させる
       const issuedAt = typeof payload.iat === 'number' ? payload.iat : 0
-      return { userId, scope, issuedAt }
+      // jti は issue #37 以前の旧 mcp トークンには付いていないため null フォールバック。
+      // middleware 側で「mcp かつ jti=null」を許容するか拒否するかを判定する。
+      const jti = typeof payload.jti === 'string' ? payload.jti : null
+      return { userId, scope, issuedAt, jti }
     } catch {
       return null
     }
