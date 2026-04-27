@@ -51,8 +51,9 @@ jobs:
           cache: 'npm'
 
       - name: Detect lockfile drift for Linux x64 platform deps
+        # --ignore-scripts: husky 等の prepare script を発火させない（node_modules を入れていないため）
         run: |
-          npm install --include=optional --os=linux --cpu=x64 --package-lock-only
+          npm install --include=optional --os=linux --cpu=x64 --package-lock-only --ignore-scripts
           if ! git diff --exit-code package-lock.json; then
             echo "::warning::package-lock.json は Linux x64 用の optional deps を欠いています。ローカルで以下を実行して push してください:"
             echo "::warning::  npm install --include=optional --os=linux --cpu=x64 --package-lock-only"
