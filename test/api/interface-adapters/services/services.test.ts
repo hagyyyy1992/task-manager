@@ -16,6 +16,18 @@ describe('ScryptPasswordHashService', () => {
     const hash = await svc.hash('hunter2')
     expect(await svc.verify('wrong', hash)).toBe(false)
   })
+
+  it('壊れた hash 形式 (区切り無し) は throw せず false を返す', async () => {
+    expect(await svc.verify('hunter2', 'broken-hash-no-colon')).toBe(false)
+  })
+
+  it('壊れた hash 形式 (key 部空文字) は throw せず false を返す', async () => {
+    expect(await svc.verify('hunter2', 'somesalt:')).toBe(false)
+  })
+
+  it('壊れた hash 形式 (key 長さ違い) は throw せず false を返す', async () => {
+    expect(await svc.verify('hunter2', 'somesalt:0123456789abcdef')).toBe(false)
+  })
 })
 
 describe('JoseTokenService', () => {
