@@ -103,7 +103,20 @@ npx prisma generate
 
 CI (`.github/workflows/deploy.yml`) は main マージ時に `prisma migrate deploy` を自動実行する。
 
-> **既存環境のベースライン (一度だけ)**: 本リポジトリは PR で生 SQL の `migrate.ts` から Prisma migrations 運用に移行した。既存の Neon 本番 DB に対しては `npx prisma migrate resolve --applied 0_init` を一度だけ実行して 0_init を「適用済み」マークする必要がある（テーブルは既に存在するため）。
+### ⚠️ 既存環境のベースライン (本 PR マージ前に一度だけ実行)
+
+本リポジトリは生 SQL の `migrate.ts` から Prisma migrations 運用に移行した。**この移行 PR をマージする前** に、既存の Neon 本番 DB に対して 0_init を「適用済み」マークする必要がある（テーブルは既に存在するため、未マークのまま CI が走ると `CREATE TABLE` 衝突で deploy 失敗）。
+
+```bash
+# 順序が重要 — マージより先に実行すること
+DATABASE_URL='<prod connection string>' npx prisma migrate resolve --applied 0_init
+
+# 完了確認
+DATABASE_URL='<prod connection string>' npx prisma migrate status
+# → "Database schema is up to date!" が出れば OK
+```
+
+実行後は `_prisma_migrations` テーブルに `0_init` が記録され、以降の CI は新規マイグレーションのみ流す。
 
 ## 起動
 
