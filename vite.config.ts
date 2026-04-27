@@ -28,9 +28,9 @@ export default defineConfig({
       ],
       // 達成値からおよそ -2% の余裕を残してロック。CI 揺れによる即時破断を避けるため。
       thresholds: {
-        statements: 96,
-        branches: 90,
-        functions: 95,
+        statements: 97,
+        branches: 93,
+        functions: 98,
         lines: 97,
       },
     },
