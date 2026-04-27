@@ -196,13 +196,24 @@ describe('task endpoints', () => {
   })
 
   it('POST /api/tasks creates a task', async () => {
-    vi.mocked(container.createTask.execute).mockResolvedValue(mockTask)
+    vi.mocked(container.createTask.execute).mockResolvedValue({ ok: true, task: mockTask })
     const res = await req('/api/tasks', { method: 'POST', body: mockTask })
     expect(res.status).toBe(201)
     expect(container.createTask.execute).toHaveBeenCalledWith({
       userId: 'user123',
       task: mockTask,
     })
+  })
+
+  it('POST /api/tasks invalid_input → 400', async () => {
+    vi.mocked(container.createTask.execute).mockResolvedValue({
+      ok: false,
+      reason: 'invalid_input',
+      message: 'title is required',
+    })
+    const res = await req('/api/tasks', { method: 'POST', body: {} })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('title')
   })
 
   it('PATCH /api/tasks/:id updates a task', async () => {

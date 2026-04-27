@@ -1,9 +1,7 @@
-import type { TaskUpdate } from '../../../domain/entities/Task.js'
-
 export interface UpdateTaskInput {
   userId: string
   id: string
-  updates: TaskUpdate
+  updates: unknown
 }
 
 export interface UpdateTaskUseCase {

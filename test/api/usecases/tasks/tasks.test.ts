@@ -39,11 +39,51 @@ describe('ListTasksInteractor', () => {
 })
 
 describe('CreateTaskInteractor', () => {
-  it('repo.create を呼んで task を返す', async () => {
+  const validInput = {
+    title: 'タスク',
+    status: 'todo' as const,
+    priority: 'medium' as const,
+    category: 'その他',
+  }
+
+  it('成功時は id/createdAt/updatedAt をサーバ生成し ok:true で返す', async () => {
     const repo = makeRepo({ create: vi.fn().mockResolvedValue(undefined) })
-    const out = await new CreateTaskInteractor(repo).execute({ userId: 'u1', task: mockTask })
-    expect(out).toBe(mockTask)
-    expect(repo.create).toHaveBeenCalledWith(mockTask, 'u1')
+    const out = await new CreateTaskInteractor(repo).execute({ userId: 'u1', task: validInput })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.task.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(out.task.title).toBe('タスク')
+    expect(out.task.dueDate).toBeNull()
+    expect(out.task.memo).toBe('')
+    expect(out.task.pinned).toBe(false)
+    expect(out.task.createdAt).toBe(out.task.updatedAt)
+    expect(repo.create).toHaveBeenCalledWith(out.task, 'u1')
+  })
+
+  it('クライアント送信の id/createdAt は無視される（サーバ採番）', async () => {
+    const repo = makeRepo({ create: vi.fn().mockResolvedValue(undefined) })
+    const out = await new CreateTaskInteractor(repo).execute({
+      userId: 'u1',
+      task: { ...validInput, id: 'attacker-id', createdAt: '1970-01-01T00:00:00.000Z' },
+    })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.task.id).not.toBe('attacker-id')
+    expect(out.task.createdAt).not.toBe('1970-01-01T00:00:00.000Z')
+  })
+
+  it.each([
+    { ...validInput, title: '' },
+    { ...validInput, title: 'a'.repeat(201) },
+    { ...validInput, status: 'unknown' },
+    { ...validInput, priority: 'urgent' },
+    { ...validInput, dueDate: 'not-a-date' },
+    { ...validInput, category: '' },
+  ])('不正入力は invalid_input', async (bad) => {
+    const repo = makeRepo({ create: vi.fn() })
+    const out = await new CreateTaskInteractor(repo).execute({ userId: 'u1', task: bad })
+    expect(out.ok).toBe(false)
+    expect(repo.create).not.toHaveBeenCalled()
   })
 })
 
@@ -67,6 +107,28 @@ describe('UpdateTaskInteractor', () => {
       updates: {},
     })
     expect(out).toEqual({ ok: false, reason: 'not_found' })
+  })
+
+  it('不正な dueDate は invalid_input', async () => {
+    const repo = makeRepo({ update: vi.fn() })
+    const out = await new UpdateTaskInteractor(repo).execute({
+      userId: 'u1',
+      id: 't1',
+      updates: { dueDate: 'not-a-date' },
+    })
+    expect(out.ok).toBe(false)
+    expect(repo.update).not.toHaveBeenCalled()
+  })
+
+  it('不正な status は invalid_input', async () => {
+    const repo = makeRepo({ update: vi.fn() })
+    const out = await new UpdateTaskInteractor(repo).execute({
+      userId: 'u1',
+      id: 't1',
+      updates: { status: 'unknown' },
+    })
+    expect(out.ok).toBe(false)
+    expect(repo.update).not.toHaveBeenCalled()
   })
 })
 
