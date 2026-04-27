@@ -136,6 +136,18 @@ npm run dev:api
 
 フロントエンドはこの API サーバーを通じて DB と通信する。本番（Lambda）では `api/lambda.ts` を esbuild でバンドルした成果物が同じ Hono app を提供する。
 
+### 統合テスト (実 Postgres を使うもの)
+
+`*.integration.test.ts` (例: `PrismaTaskRepository.cursor.integration.test.ts`) は `@testcontainers/postgresql` で実 Postgres を立てて検証する。docker daemon が動いていない環境では `docker info` の成否で自動 skip される。
+
+```bash
+# 1. Docker / Colima を起動
+colima start   # もしくは Docker Desktop を起動
+
+# 2. テストを通常どおり実行 (skip されず実コンテナで走る)
+npm run test
+```
+
 ## REST API
 
 ### 認証（公開）
