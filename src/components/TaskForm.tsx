@@ -65,6 +65,7 @@ export function TaskForm({
         category: finalCategory,
         dueDate: dueDate || null,
         memo,
+        pinned: false,
         createdAt: now,
         updatedAt: now,
       })

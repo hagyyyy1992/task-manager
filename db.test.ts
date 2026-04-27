@@ -99,6 +99,7 @@ const taskRow = {
   category: 'その他',
   dueDate: new Date('2026-05-01T00:00:00.000Z'),
   memo: 'メモ',
+  pinned: false,
   createdAt: baseDate,
   updatedAt: baseDate,
 }
@@ -152,7 +153,10 @@ describe('loadTasks', () => {
   it('フィルタなしで全件取得する', async () => {
     taskFindMany.mockResolvedValue([taskRow])
     const result = await loadTasks()
-    expect(taskFindMany).toHaveBeenCalledWith({ where: {}, orderBy: { createdAt: 'desc' } })
+    expect(taskFindMany).toHaveBeenCalledWith({
+      where: {},
+      orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+    })
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe('t1')
     expect(result[0].dueDate).toBe('2026-05-01')
@@ -164,7 +168,7 @@ describe('loadTasks', () => {
     await loadTasks({ userId: 'u1', status: 'todo', category: 'その他' })
     expect(taskFindMany).toHaveBeenCalledWith({
       where: { userId: 'u1', status: 'todo', category: 'その他' },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
     })
   })
 
@@ -258,6 +262,21 @@ describe('updateTask', () => {
     taskUpdate.mockResolvedValue(taskRow)
     await updateTask('t1', { dueDate: null }, 'u1')
     expect(taskUpdate.mock.calls[0][0].data.dueDate).toBeNull()
+  })
+
+  it('pinned=true の更新ができる', async () => {
+    taskFindFirst.mockResolvedValue(taskRow)
+    taskUpdate.mockResolvedValue({ ...taskRow, pinned: true })
+    const result = await updateTask('t1', { pinned: true }, 'u1')
+    expect(taskUpdate.mock.calls[0][0].data.pinned).toBe(true)
+    expect(result?.pinned).toBe(true)
+  })
+
+  it('pinned=false の更新ができる（ピン解除）', async () => {
+    taskFindFirst.mockResolvedValue({ ...taskRow, pinned: true })
+    taskUpdate.mockResolvedValue({ ...taskRow, pinned: false })
+    await updateTask('t1', { pinned: false }, 'u1')
+    expect(taskUpdate.mock.calls[0][0].data.pinned).toBe(false)
   })
 })
 

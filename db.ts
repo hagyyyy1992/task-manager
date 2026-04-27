@@ -30,6 +30,7 @@ export interface Task {
   category: string
   dueDate: string | null
   memo: string
+  pinned: boolean
   createdAt: string
   updatedAt: string
 }
@@ -42,6 +43,7 @@ function dbTaskToTask(row: {
   category: string
   dueDate: Date | null
   memo: string
+  pinned: boolean
   createdAt: Date
   updatedAt: Date
 }): Task {
@@ -53,6 +55,7 @@ function dbTaskToTask(row: {
     category: row.category,
     dueDate: row.dueDate ? row.dueDate.toISOString().slice(0, 10) : null,
     memo: row.memo,
+    pinned: row.pinned,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -70,7 +73,8 @@ export async function loadTasks(filters?: {
 
   const rows = await prisma.task.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    // ピン済みを常に最上部に。同区分内は createdAt 降順。
+    orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
   })
 
   return rows.map(dbTaskToTask)
@@ -86,6 +90,7 @@ export async function createTask(task: Task, userId: string): Promise<void> {
       category: task.category.trim(),
       dueDate: task.dueDate ? new Date(task.dueDate + 'T00:00:00Z') : null,
       memo: task.memo,
+      pinned: task.pinned,
       userId,
       createdAt: new Date(task.createdAt),
       updatedAt: new Date(task.updatedAt),
@@ -95,7 +100,9 @@ export async function createTask(task: Task, userId: string): Promise<void> {
 
 export async function updateTask(
   id: string,
-  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category'>>,
+  updates: Partial<
+    Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category' | 'pinned'>
+  >,
   userId: string,
 ): Promise<Task | null> {
   const existing = await prisma.task.findFirst({ where: { id, userId } })
@@ -108,6 +115,7 @@ export async function updateTask(
   if (updates.priority !== undefined) data.priority = updates.priority
   if (updates.memo !== undefined) data.memo = updates.memo
   if (updates.category !== undefined) data.category = updates.category.trim()
+  if (updates.pinned !== undefined) data.pinned = updates.pinned
   if (updates.dueDate !== undefined) {
     data.dueDate = updates.dueDate ? new Date(updates.dueDate + 'T00:00:00Z') : null
   }

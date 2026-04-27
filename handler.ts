@@ -377,7 +377,7 @@ export const handler = async (event: LambdaEvent) => {
     if (patchMatch && method === 'PATCH') {
       const id = patchMatch[1]
       const updates = parseBody(event) as Partial<
-        Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category'>
+        Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category' | 'pinned'>
       >
       const updated = await updateTask(id, updates, userId)
       if (!updated) {

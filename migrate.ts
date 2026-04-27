@@ -47,6 +47,10 @@ console.log('✅ users.terms_agreed_at カラムを追加しました')
 await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id)`
 console.log('✅ tasks.user_id カラムを追加しました')
 
+// tasksテーブルに pinned カラム追加（issue #14）
+await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false`
+console.log('✅ tasks.pinned カラムを追加しました')
+
 // 既存タスクをkeiichi.hagiwara.1992@gmail.comユーザーに紐付け
 const seedUser = await sql`SELECT id FROM users WHERE email = 'keiichi.hagiwara.1992@gmail.com'`
 if (seedUser.length > 0) {

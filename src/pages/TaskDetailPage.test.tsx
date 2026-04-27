@@ -40,6 +40,7 @@ const mockTask = {
   category: 'その他' as const,
   dueDate: '2026-05-01',
   memo: 'メモです',
+  pinned: false,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
