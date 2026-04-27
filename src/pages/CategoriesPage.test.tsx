@@ -259,16 +259,108 @@ describe('CategoriesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '追加' }))
     await waitFor(() => expect(screen.getByText('作成失敗')).toBeInTheDocument())
   })
+})
 
-  it('reorder ロールバック: 失敗時は元の並びに戻り、エラー表示', async () => {
+// 別の describe ブロックで DndContext をモックして handleDragEnd を直接呼ぶ
+describe('CategoriesPage - DnD reorder', () => {
+  let capturedOnDragEnd:
+    | ((e: { active: { id: string }; over: { id: string } | null }) => void)
+    | null = null
+
+  beforeEach(() => {
+    capturedOnDragEnd = null
+    vi.resetModules()
+    vi.doMock('@dnd-kit/core', async () => {
+      const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core')
+      return {
+        ...actual,
+        DndContext: ({
+          children,
+          onDragEnd,
+        }: {
+          children: React.ReactNode
+          onDragEnd: (e: { active: { id: string }; over: { id: string } | null }) => void
+        }) => {
+          capturedOnDragEnd = onDragEnd
+          return <>{children}</>
+        },
+      }
+    })
+  })
+
+  async function setup() {
+    const { CategoriesPage: Page } = await import('./CategoriesPage')
+    return render(
+      <MemoryRouter>
+        <Page />
+      </MemoryRouter>,
+    )
+  }
+
+  it('並び替え成功時: API 呼び出し + サーバ応答を反映', async () => {
     vi.mocked(loadCategories).mockResolvedValue(cats)
-    vi.mocked(apiReorderCategories).mockRejectedValue(new Error('並び替え失敗'))
-    const { container } = renderPage()
+    const reordered = [
+      { ...cats[1], sortOrder: 0 },
+      { ...cats[0], sortOrder: 1 },
+      { ...cats[2], sortOrder: 2 },
+    ]
+    vi.mocked(apiReorderCategories).mockResolvedValue(reordered)
+    await setup()
     await waitFor(() => expect(screen.getByText('案件')).toBeInTheDocument())
 
-    // CategoriesPage の handleDragEnd を直接呼ぶ手段が無いので
-    // Reorder を直接モックで呼んでロールバックパスは別途確認するスタイルにする
-    // ここでは API が呼ばれるだけ確認する
-    expect(container).toBeTruthy()
+    capturedOnDragEnd!({ active: { id: 'c1' }, over: { id: 'c2' } })
+    await waitFor(() => expect(apiReorderCategories).toHaveBeenCalledWith(['c2', 'c1', 'c3']))
+  })
+
+  it('並び替え失敗時: 元の並びにロールバックしてエラー表示', async () => {
+    vi.mocked(loadCategories).mockResolvedValue(cats)
+    vi.mocked(apiReorderCategories).mockRejectedValue(new Error('並び替え失敗'))
+    await setup()
+    await waitFor(() => expect(screen.getByText('案件')).toBeInTheDocument())
+
+    capturedOnDragEnd!({ active: { id: 'c1' }, over: { id: 'c2' } })
+    await waitFor(() => expect(screen.getByText('並び替え失敗')).toBeInTheDocument())
+  })
+
+  it('over が null なら何もしない', async () => {
+    vi.mocked(loadCategories).mockResolvedValue(cats)
+    await setup()
+    await waitFor(() => expect(screen.getByText('案件')).toBeInTheDocument())
+    capturedOnDragEnd!({ active: { id: 'c1' }, over: null })
+    expect(apiReorderCategories).not.toHaveBeenCalled()
+  })
+
+  it('active.id === over.id なら何もしない', async () => {
+    vi.mocked(loadCategories).mockResolvedValue(cats)
+    await setup()
+    await waitFor(() => expect(screen.getByText('案件')).toBeInTheDocument())
+    capturedOnDragEnd!({ active: { id: 'c1' }, over: { id: 'c1' } })
+    expect(apiReorderCategories).not.toHaveBeenCalled()
+  })
+
+  it('stale レスポンスは破棄される（後続の reorder が先に解決）', async () => {
+    vi.mocked(loadCategories).mockResolvedValue(cats)
+    let resolveFirst!: (v: Category[]) => void
+    let resolveSecond!: (v: Category[]) => void
+    vi.mocked(apiReorderCategories)
+      .mockImplementationOnce(() => new Promise<Category[]>((r) => (resolveFirst = r)))
+      .mockImplementationOnce(() => new Promise<Category[]>((r) => (resolveSecond = r)))
+    await setup()
+    await waitFor(() => expect(screen.getByText('案件')).toBeInTheDocument())
+
+    // 1 回目をキック
+    capturedOnDragEnd!({ active: { id: 'c1' }, over: { id: 'c2' } })
+    // 2 回目をキック（seq が更新される）
+    capturedOnDragEnd!({ active: { id: 'c1' }, over: { id: 'c3' } })
+
+    // 1 回目を遅延で解決（stale）
+    resolveFirst([])
+    // 2 回目を解決
+    resolveSecond([
+      { ...cats[1], sortOrder: 0 },
+      { ...cats[2], sortOrder: 1 },
+      { ...cats[0], sortOrder: 2 },
+    ])
+    await waitFor(() => expect(apiReorderCategories).toHaveBeenCalledTimes(2))
   })
 })

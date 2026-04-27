@@ -7,6 +7,7 @@ vi.mock('../store', () => ({
   loadTask: vi.fn(),
   apiUpdateTask: vi.fn(),
   apiDeleteTask: vi.fn(),
+  apiCreateCategory: vi.fn(),
   loadCategories: vi.fn().mockResolvedValue([
     {
       id: 'cat1',
@@ -29,7 +30,7 @@ vi.mock('../useAuth', () => ({
   }),
 }))
 
-import { loadTask, apiDeleteTask } from '../store'
+import { loadTask, apiDeleteTask, apiUpdateTask, apiCreateCategory } from '../store'
 
 const mockTask = {
   id: 'task1',
@@ -160,5 +161,145 @@ describe('TaskDetailPage', () => {
 
     expect(apiDeleteTask).not.toHaveBeenCalled()
     expect(screen.getByText('テストタスク')).toBeInTheDocument()
+  })
+
+  it('編集 → 保存で apiUpdateTask が呼ばれる', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    vi.mocked(apiUpdateTask).mockResolvedValue({ ...mockTask, title: '更新後' })
+    renderWithRouter('task1')
+
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    const titleInput = await screen.findByDisplayValue('テストタスク')
+    fireEvent.change(titleInput, { target: { value: '更新後' } })
+    fireEvent.click(screen.getByText('保存'))
+
+    await waitFor(() =>
+      expect(apiUpdateTask).toHaveBeenCalledWith(
+        'task1',
+        expect.objectContaining({ title: '更新後' }),
+      ),
+    )
+  })
+
+  it('編集中: タイトル空のままだと保存しない', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    const titleInput = await screen.findByDisplayValue('テストタスク')
+    fireEvent.change(titleInput, { target: { value: '   ' } })
+    fireEvent.click(screen.getByText('保存'))
+    expect(apiUpdateTask).not.toHaveBeenCalled()
+  })
+
+  it('編集中: 保存失敗時に alert で通知し編集モードに戻る', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    vi.mocked(apiUpdateTask).mockRejectedValue(new Error('保存失敗'))
+    window.alert = vi.fn()
+
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    const titleInput = await screen.findByDisplayValue('テストタスク')
+    fireEvent.change(titleInput, { target: { value: '別のタイトル' } })
+    fireEvent.click(screen.getByText('保存'))
+
+    await waitFor(() =>
+      expect(
+        (window.alert as unknown as { mock: { calls: string[][] } }).mock.calls[0][0],
+      ).toContain('保存に失敗'),
+    )
+    // 編集モードに戻っているので「保存」ボタンが残る
+    expect(screen.getByText('保存')).toBeInTheDocument()
+  })
+
+  it('編集中: 新規カテゴリを作成して保存', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    vi.mocked(apiCreateCategory).mockResolvedValue({
+      id: 'c-new',
+      userId: 'u1',
+      name: '新規',
+      sortOrder: 1,
+      createdAt: '',
+    })
+    vi.mocked(apiUpdateTask).mockResolvedValue({ ...mockTask, category: '新規' })
+
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    fireEvent.click(await screen.findByTitle('新規カテゴリ'))
+    fireEvent.change(screen.getByPlaceholderText('新しいカテゴリ名'), {
+      target: { value: '新規' },
+    })
+    fireEvent.click(screen.getByText('保存'))
+
+    await waitFor(() => expect(apiCreateCategory).toHaveBeenCalledWith('新規', 1))
+    await waitFor(() => expect(apiUpdateTask).toHaveBeenCalled())
+  })
+
+  it('編集中: 新規カテゴリ作成失敗（既存名）でも続行する', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    vi.mocked(apiCreateCategory).mockRejectedValue(new Error('既に存在'))
+    vi.mocked(apiUpdateTask).mockResolvedValue(mockTask)
+
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    fireEvent.click(await screen.findByTitle('新規カテゴリ'))
+    fireEvent.change(screen.getByPlaceholderText('新しいカテゴリ名'), {
+      target: { value: 'その他' },
+    })
+    fireEvent.click(screen.getByText('保存'))
+
+    await waitFor(() => expect(apiUpdateTask).toHaveBeenCalled())
+  })
+
+  it('編集中: 新規カテゴリ作成失敗（その他のエラー）で alert 表示し中断', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    vi.mocked(apiCreateCategory).mockRejectedValue(new Error('別エラー'))
+    window.alert = vi.fn()
+
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    fireEvent.click(await screen.findByTitle('新規カテゴリ'))
+    fireEvent.change(screen.getByPlaceholderText('新しいカテゴリ名'), {
+      target: { value: '新規' },
+    })
+    fireEvent.click(screen.getByText('保存'))
+
+    await waitFor(() => expect(window.alert).toHaveBeenCalled())
+    expect(apiUpdateTask).not.toHaveBeenCalled()
+  })
+
+  it('編集中: 新規カテゴリ入力の ✕ で既存選択に戻る', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    fireEvent.click(await screen.findByTitle('新規カテゴリ'))
+    expect(screen.getByPlaceholderText('新しいカテゴリ名')).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('既存から選択'))
+    expect(screen.queryByPlaceholderText('新しいカテゴリ名')).not.toBeInTheDocument()
+  })
+
+  it('削除失敗時はナビゲートしない', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    vi.mocked(apiDeleteTask).mockRejectedValue(new Error('fail'))
+    window.confirm = vi.fn().mockReturnValue(true)
+
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByText('削除').find((el) => el.closest('header'))!)
+    await waitFor(() => expect(apiDeleteTask).toHaveBeenCalled())
+    expect(screen.queryByTestId('list-page')).not.toBeInTheDocument()
   })
 })
