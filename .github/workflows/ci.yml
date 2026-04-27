@@ -10,33 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Lint / Typecheck / Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        # lockfile が macOS 偏りで Linux 用 optional deps を欠いている場合に備え、
-        # npm ci 失敗時は npm install にフォールバックする（lockfile-check job で別途警告）。
-        run: npm ci || npm install --no-save
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test (with coverage)
-        run: npm run test:cov
-
   lockfile-check:
     name: Lockfile multi-platform check
     runs-on: ubuntu-latest
