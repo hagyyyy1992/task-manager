@@ -93,9 +93,11 @@ export class PrismaUserRepository implements UserRepository {
     if (!existing) return false
     // ON DELETE CASCADE のスキーマ設定に依存せず、関連データを明示的に同一トランザクションで削除する
     // (個人情報削除責任をアプリ層で明示し、孤児レコード残存を防止)
+    // Token は revoke 履歴を含む認証関連データなので、user 削除と同じトランザクションで明示的に消す。
     await this.prisma.$transaction([
       this.prisma.task.deleteMany({ where: { userId: id } }),
       this.prisma.category.deleteMany({ where: { userId: id } }),
+      this.prisma.token.deleteMany({ where: { userId: id } }),
       this.prisma.user.delete({ where: { id } }),
     ])
     return true

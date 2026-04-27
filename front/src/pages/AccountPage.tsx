@@ -1,7 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../useAuth'
-import { changePassword } from '../auth'
+import {
+  changePassword,
+  issueMcpToken,
+  listMcpTokens,
+  revokeMcpToken,
+  type McpToken,
+} from '../auth'
 import { PasswordInput } from '../components/PasswordInput'
 import { AppHeader } from '../components/AppHeader'
 
@@ -18,6 +24,57 @@ export function AccountPage() {
   const [pwError, setPwError] = useState('')
   const [pwSuccess, setPwSuccess] = useState('')
   const [pwSubmitting, setPwSubmitting] = useState(false)
+
+  // MCP token 管理 (issue #37)
+  const [mcpTokens, setMcpTokens] = useState<McpToken[] | null>(null)
+  const [mcpError, setMcpError] = useState('')
+  const [newMcpLabel, setNewMcpLabel] = useState('')
+  const [issuing, setIssuing] = useState(false)
+  // issue 直後の生 JWT は 1 度しか返らないので state に持って表示する
+  const [justIssuedToken, setJustIssuedToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setMcpTokens(await listMcpTokens())
+      } catch (e) {
+        setMcpError(e instanceof Error ? e.message : 'Failed to load MCP tokens')
+      }
+    })()
+  }, [])
+
+  const handleIssueMcpToken = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMcpError('')
+    setJustIssuedToken(null)
+    setIssuing(true)
+    try {
+      const { token } = await issueMcpToken(newMcpLabel)
+      setJustIssuedToken(token)
+      setNewMcpLabel('')
+      setMcpTokens(await listMcpTokens())
+    } catch (err) {
+      setMcpError(err instanceof Error ? err.message : 'Failed')
+    } finally {
+      setIssuing(false)
+    }
+  }
+
+  const handleRevokeMcpToken = async (id: string, label: string) => {
+    if (
+      !confirm(
+        `MCPトークン「${label || '(no label)'}」を取消しますか？このトークンを使っている連携は即座に動かなくなります。`,
+      )
+    )
+      return
+    setMcpError('')
+    try {
+      await revokeMcpToken(id)
+      setMcpTokens(await listMcpTokens())
+    } catch (err) {
+      setMcpError(err instanceof Error ? err.message : 'Failed')
+    }
+  }
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,6 +205,93 @@ export function AccountPage() {
           >
             カテゴリの編集・削除
           </Link>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">MCP トークン</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Claude Code などの MCP クライアントから接続するための長期トークンを発行・取消します。
+              トークンを紛失した場合は必ず取消してください。
+            </p>
+          </div>
+
+          {mcpError && (
+            <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400 rounded-lg px-3 py-2">
+              {mcpError}
+            </div>
+          )}
+
+          {justIssuedToken && (
+            <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/30 px-3 py-3 space-y-2">
+              <p className="text-xs font-semibold text-yellow-900 dark:text-yellow-200">
+                ⚠️ このトークンは一度しか表示されません。今すぐコピーしてください。
+              </p>
+              <textarea
+                readOnly
+                value={justIssuedToken}
+                onFocus={(e) => e.currentTarget.select()}
+                rows={3}
+                className="w-full text-xs font-mono bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded p-2"
+              />
+              <button
+                type="button"
+                onClick={() => setJustIssuedToken(null)}
+                className="text-xs text-gray-600 dark:text-gray-400 underline"
+              >
+                閉じる
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleIssueMcpToken} className="flex gap-2">
+            <input
+              type="text"
+              value={newMcpLabel}
+              onChange={(e) => setNewMcpLabel(e.target.value)}
+              placeholder="ラベル（例: macbook claude code）"
+              maxLength={100}
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-lg"
+            />
+            <button
+              type="submit"
+              disabled={issuing}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+            >
+              {issuing ? '発行中...' : '新規発行'}
+            </button>
+          </form>
+
+          {mcpTokens === null ? (
+            <p className="text-xs text-gray-500">読み込み中...</p>
+          ) : mcpTokens.length === 0 ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              アクティブな MCP トークンはありません。
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+              {mcpTokens.map((t) => (
+                <li key={t.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-900 dark:text-gray-100 truncate">
+                      {t.label || <span className="text-gray-400">(no label)</span>}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      発行: {new Date(t.createdAt).toLocaleDateString('ja-JP')} ・ 最終利用:{' '}
+                      {t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleDateString('ja-JP') : '未使用'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRevokeMcpToken(t.id, t.label)}
+                    className="px-3 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/30 shrink-0"
+                  >
+                    取消
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">

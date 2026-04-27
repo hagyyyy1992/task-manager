@@ -14,6 +14,9 @@ vi.mock('@/useAuth', () => ({
 vi.mock('@/auth', () => ({
   changePassword: vi.fn(),
   authHeaders: () => ({}),
+  listMcpTokens: vi.fn().mockResolvedValue([]),
+  issueMcpToken: vi.fn(),
+  revokeMcpToken: vi.fn(),
 }))
 
 import { changePassword } from '@/auth'

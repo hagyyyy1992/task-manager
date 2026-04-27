@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from 'hono'
 import type { TokenScope, TokenService } from '../../domain/services/TokenService.js'
 import type { UserRepository } from '../../domain/repositories/UserRepository.js'
+import type { TokenRepository } from '../../domain/repositories/TokenRepository.js'
 
 export type AuthEnv = { Variables: { userId: string; scope: TokenScope } }
 
@@ -12,6 +13,7 @@ export interface AuthMiddlewareOptions {
 export function createAuthMiddleware(
   tokens: TokenService,
   users: UserRepository,
+  tokenRepo: TokenRepository,
   options: AuthMiddlewareOptions = {},
 ): MiddlewareHandler<AuthEnv> {
   const allowedScopes: TokenScope[] = options.allowedScopes ?? ['session']
@@ -42,6 +44,26 @@ export function createAuthMiddleware(
       if (verified.issuedAt + CLOCK_SKEW_GRACE_SEC < passwordChangedAtSec) {
         return c.json({ error: 'invalid or expired token' }, 401)
       }
+    }
+    // mcp scope は Token テーブルと突き合わせて個別失効を検査する (issue #37)。
+    // jti が無い旧 mcp トークン (PR #35〜本機構導入前に発行) は revoke 不能なので、
+    // セキュリティ上拒否し、再発行を強制する。
+    if (verified.scope === 'mcp') {
+      if (!verified.jti) {
+        return c.json(
+          {
+            error:
+              'mcp token without jti is no longer accepted; please re-issue from the account page',
+          },
+          401,
+        )
+      }
+      const tokenRow = await tokenRepo.findByJti(verified.jti)
+      if (!tokenRow || tokenRow.userId !== verified.userId || tokenRow.revokedAt !== null) {
+        return c.json({ error: 'invalid or expired token' }, 401)
+      }
+      // lastUsedAt は監査用。失敗しても認証フローは止めない (fire-and-forget)
+      tokenRepo.touchLastUsed(verified.jti, new Date()).catch(() => {})
     }
     c.set('userId', verified.userId)
     c.set('scope', verified.scope)

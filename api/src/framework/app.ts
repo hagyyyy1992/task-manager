@@ -55,7 +55,10 @@ export function buildApp(options: BuildAppOptions = {}): Hono<AuthEnv> {
 
   // /api/tasks, /api/categories は全エンドポイント認証必須
   const protectedApp = new Hono<AuthEnv>()
-  protectedApp.use('*', createAuthMiddleware(container.tokens, container.users))
+  protectedApp.use(
+    '*',
+    createAuthMiddleware(container.tokens, container.users, container.tokenRepo),
+  )
   protectedApp.route('/tasks', createTasksController(container))
   protectedApp.route('/categories', createCategoriesController(container))
   app.route('/api', protectedApp)
