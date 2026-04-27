@@ -99,4 +99,41 @@ describe('RegisterInteractor', () => {
     if (!result.ok) expect(result.reason).toBe('duplicate')
     expect(categories.seedDefaults).not.toHaveBeenCalled()
   })
+
+  it.each([
+    'plain-string',
+    'a@b',
+    'no-at-symbol',
+    'with space@example.com',
+    'newline@example.com\nX-Header: x',
+    'a'.repeat(300) + '@example.com',
+  ])('不正な email=%s は invalid_input', async (email) => {
+    const result = await interactor.execute({ ...validInput, email })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toMatch(/email/)
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('過剰に長い name は invalid_input', async () => {
+    const result = await interactor.execute({ ...validInput, name: 'x'.repeat(101) })
+    expect(result.ok).toBe(false)
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('過剰に長い password は invalid_input', async () => {
+    const result = await interactor.execute({ ...validInput, password: 'x'.repeat(257) })
+    expect(result.ok).toBe(false)
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('email は trim/lower-case してから保存', async () => {
+    await interactor.execute({ ...validInput, email: '  Test@Example.COM  ' })
+    expect(users.create).toHaveBeenCalledWith(
+      expect.any(String),
+      'test@example.com',
+      'Test User',
+      expect.any(String),
+      expect.any(String),
+    )
+  })
 })
