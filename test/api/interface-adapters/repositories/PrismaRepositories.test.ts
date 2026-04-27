@@ -508,7 +508,7 @@ describe('PrismaUserRepository', () => {
     expect(await repo.delete('u1')).toBe(false)
   })
 
-  it('delete: 関連 task/category も同一トランザクションで削除する', async () => {
+  it('delete: 関連 task/category/token も同一トランザクションで削除する', async () => {
     prisma.user.findUnique.mockResolvedValue(userRow)
     const ops: string[] = []
     prisma.task.deleteMany = vi.fn(async () => {
@@ -519,6 +519,10 @@ describe('PrismaUserRepository', () => {
       ops.push('category.deleteMany')
       return { count: 3 }
     })
+    prisma.token.deleteMany = vi.fn(async () => {
+      ops.push('token.deleteMany')
+      return { count: 2 }
+    })
     prisma.user.delete = vi.fn(async () => {
       ops.push('user.delete')
       return userRow
@@ -527,9 +531,16 @@ describe('PrismaUserRepository', () => {
 
     const repo = new PrismaUserRepository(prisma as unknown as never)
     expect(await repo.delete('u1')).toBe(true)
-    expect(ops).toEqual(['task.deleteMany', 'category.deleteMany', 'user.delete'])
+    // Token も明示削除し、認証関連データを孤児化させない (codex review #50 対応)
+    expect(ops).toEqual([
+      'task.deleteMany',
+      'category.deleteMany',
+      'token.deleteMany',
+      'user.delete',
+    ])
     expect(prisma.task.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
     expect(prisma.category.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
+    expect(prisma.token.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } })
   })
 })
 

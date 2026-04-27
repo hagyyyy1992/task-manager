@@ -28,10 +28,11 @@ export class IssueMcpTokenInteractor implements IssueMcpTokenUseCase {
       }
     }
     // jti / id は推測困難な乱数 (UUIDv4)。jti が JWT claim と DB の照合キーになる。
+    // jti は内部識別子のため output には含めない (codex review #50 対応)。
     const id = randomUUID()
     const jti = randomUUID()
     const token = await this.tokens.issueLongLived(input.userId, jti)
     await this.tokenRepo.create({ id, userId: input.userId, scope: 'mcp', jti, label })
-    return { ok: true, token, tokenId: id, jti }
+    return { ok: true, token, tokenId: id }
   }
 }

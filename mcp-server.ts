@@ -6,6 +6,7 @@ import { createPrismaClient } from './api/src/framework/prisma/client.js'
 import { PrismaTaskRepository } from './api/src/interface-adapters/repositories/PrismaTaskRepository.js'
 import { PrismaCategoryRepository } from './api/src/interface-adapters/repositories/PrismaCategoryRepository.js'
 import { PrismaUserRepository } from './api/src/interface-adapters/repositories/PrismaUserRepository.js'
+import { PrismaTokenRepository } from './api/src/interface-adapters/repositories/PrismaTokenRepository.js'
 import { JoseTokenService } from './api/src/interface-adapters/services/JoseTokenService.js'
 import type { Task } from './api/src/domain/entities/Task.js'
 
@@ -18,6 +19,7 @@ const prisma = createPrismaClient()
 const taskRepo = new PrismaTaskRepository(prisma)
 const categoryRepo = new PrismaCategoryRepository(prisma)
 const userRepo = new PrismaUserRepository(prisma)
+const tokenRepo = new PrismaTokenRepository(prisma)
 const tokens = new JoseTokenService(process.env.JWT_SECRET ?? '')
 
 const verified = await tokens.verify(token)
@@ -27,7 +29,45 @@ if (!verified) {
 if (verified.scope !== 'mcp') {
   throw new Error('TASK_APP_TOKEN の scope が mcp ではありません')
 }
+// jti 必須化 (issue #37)。本機構導入前の旧トークンには jti が無く revoke 不能なので、
+// HTTP API 側 (auth.middleware) と同様に MCP でも受理しない。
+if (!verified.jti) {
+  throw new Error(
+    'TASK_APP_TOKEN に jti claim がありません。アカウント画面から再発行してください。',
+  )
+}
 const userId = verified.userId
+const sessionJti = verified.jti
+const sessionIssuedAt = verified.issuedAt
+
+// ツール呼び出しごとに DB と突き合わせて、起動後にユーザーが
+// 取消・パスワード変更・アカウント削除した場合に即座に動作を止める (codex review #50 対応)。
+// 起動時の 1 回検証だけだと、長時間動作する MCP プロセスが revoke を反映できない。
+async function assertTokenStillValid() {
+  const tokenRow = await tokenRepo.findByJti(sessionJti)
+  if (!tokenRow || tokenRow.userId !== userId || tokenRow.revokedAt !== null) {
+    throw new Error(
+      'TASK_APP_TOKEN が取消されたか無効になっています。アカウント画面から再発行してください。',
+    )
+  }
+  const user = await userRepo.findById(userId)
+  if (!user) {
+    throw new Error('TASK_APP_TOKEN のユーザーが DB に存在しません')
+  }
+  if (user.passwordChangedAt !== null) {
+    // auth.middleware と同じ秒切捨て + clock skew 5s grace の比較を再現 (issue #36)
+    const CLOCK_SKEW_GRACE_SEC = 5
+    const passwordChangedAtSec = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000)
+    if (sessionIssuedAt + CLOCK_SKEW_GRACE_SEC < passwordChangedAtSec) {
+      throw new Error(
+        'TASK_APP_TOKEN がパスワード変更により失効しています。アカウント画面から再発行してください。',
+      )
+    }
+  }
+  // 監査用 lastUsedAt 更新は fire-and-forget (失敗しても認証は通す)
+  tokenRepo.touchLastUsed(sessionJti, new Date()).catch(() => {})
+  return user
+}
 
 // task-app HTTP API は cursor pagination だが、MCP は AI エージェント用に
 // 全タスクを返したいので、ここで cursor を辿って全件結合する小ヘルパを置く。
@@ -43,10 +83,7 @@ async function listAllTasks(filter: { userId: string; status?: string; category?
   return all
 }
 
-const currentUser = await userRepo.findById(userId)
-if (!currentUser) {
-  throw new Error('TASK_APP_TOKEN のユーザーが DB に存在しません')
-}
+const currentUser = await assertTokenStillValid()
 
 const server = new McpServer(
   {
@@ -65,11 +102,12 @@ server.tool(
   '現在の MCP 接続が紐づいているアカウント情報を返す。破壊的操作の前に確認用',
   {},
   async () => {
+    const user = await assertTokenStillValid()
     return {
       content: [
         {
           type: 'text',
-          text: `email: ${currentUser.email}\nuserId: ${currentUser.id}\nname: ${currentUser.name}`,
+          text: `email: ${user.email}\nuserId: ${user.id}\nname: ${user.name}`,
         },
       ],
     }
@@ -84,6 +122,7 @@ server.tool(
     category: z.string().optional().describe('フィルタするカテゴリ'),
   },
   async ({ status, category }) => {
+    await assertTokenStillValid()
     const tasks = await listAllTasks({ userId, status, category })
     if (tasks.length === 0) {
       return { content: [{ type: 'text', text: 'タスクはありません' }] }
@@ -101,6 +140,7 @@ server.tool(
 )
 
 server.tool('list_categories', '自分のカテゴリ一覧を取得', {}, async () => {
+  await assertTokenStillValid()
   const categories = await categoryRepo.list(userId)
   if (categories.length === 0) {
     return { content: [{ type: 'text', text: 'カテゴリはありません' }] }
@@ -126,6 +166,7 @@ server.tool(
     memo: z.string().default('').describe('メモ'),
   },
   async ({ title, priority, category, dueDate, memo }) => {
+    await assertTokenStillValid()
     const now = new Date().toISOString()
     const task: Task = {
       id: randomUUID(),
@@ -158,6 +199,7 @@ server.tool(
     dueDate: z.string().optional().describe('期限 (YYYY-MM-DD)。空文字で削除'),
   },
   async ({ id, ...updates }) => {
+    await assertTokenStillValid()
     const normalized: Parameters<typeof taskRepo.update>[1] = {}
     if (updates.title !== undefined) normalized.title = updates.title
     if (updates.status !== undefined) normalized.status = updates.status
@@ -189,6 +231,7 @@ server.tool(
       .describe('削除対象タスクのタイトル。実際のタイトルと一致しない場合は削除されない'),
   },
   async ({ id, expectedTitle }) => {
+    await assertTokenStillValid()
     const tasks = await listAllTasks({ userId })
     const target = tasks.find((t) => t.id === id)
     if (!target) {
