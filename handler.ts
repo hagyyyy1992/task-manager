@@ -231,7 +231,11 @@ export const handler = async (event: LambdaEvent) => {
         }
       }
 
-      const userRow = await findUserByEmail((await findUserById(userId))!.email)
+      const me = await findUserById(userId)
+      if (!me) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'unauthorized' }) }
+      }
+      const userRow = await findUserByEmail(me.email)
       if (!userRow) {
         return { statusCode: 404, headers, body: JSON.stringify({ error: 'user not found' }) }
       }

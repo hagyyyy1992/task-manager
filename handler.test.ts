@@ -658,6 +658,20 @@ describe('PATCH /api/auth/password', () => {
     expect(res.statusCode).toBe(404)
     expect(JSON.parse(res.body).error).toContain('user not found')
   })
+
+  it('returns 401 when findUserById returns null (token は通過したが DB に user 無し)', async () => {
+    vi.mocked(findUserById).mockResolvedValue(null)
+
+    const res = await handler(
+      event('PATCH', '/api/auth/password', {
+        currentPassword: 'password1234',
+        newPassword: 'newpassword5678',
+      }),
+    )
+
+    expect(res.statusCode).toBe(401)
+    expect(JSON.parse(res.body).error).toContain('unauthorized')
+  })
 })
 
 // ─── アカウント削除テスト ────────────────────────────────────────

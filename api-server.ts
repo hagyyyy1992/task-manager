@@ -185,7 +185,13 @@ const server = createServer(async (req, res) => {
         return
       }
 
-      const userRow = await findUserByEmail((await findUserById(userId))!.email)
+      const me = await findUserById(userId)
+      if (!me) {
+        res.writeHead(401, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'unauthorized' }))
+        return
+      }
+      const userRow = await findUserByEmail(me.email)
       if (!userRow) {
         res.writeHead(404, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'user not found' }))
