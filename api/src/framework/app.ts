@@ -47,7 +47,10 @@ export function buildApp(options: BuildAppOptions = {}): Hono<AuthEnv> {
   protectedApp.route('/categories', createCategoriesController(container))
   app.route('/api', protectedApp)
 
-  app.onError((err, c) => c.json({ error: String(err) }, 500))
+  app.onError((err, c) => {
+    console.error(err)
+    return c.json({ error: 'internal server error' }, 500)
+  })
 
   return app
 }

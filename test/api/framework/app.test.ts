@@ -234,11 +234,15 @@ describe('task endpoints', () => {
     expect(res.status).toBe(404)
   })
 
-  it('returns 500 on usecase error', async () => {
+  it('returns 500 with generic message on usecase error (no detail leak)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.mocked(container.listTasks.execute).mockRejectedValue(new Error('db down'))
     const res = await req('/api/tasks')
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toContain('db down')
+    const body = await res.json()
+    expect(body.error).toBe('internal server error')
+    expect(JSON.stringify(body)).not.toContain('db down')
+    errSpy.mockRestore()
   })
 })
 
