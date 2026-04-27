@@ -6,11 +6,18 @@ import { createAuthController } from './controllers/auth.controller.js'
 import { createTasksController } from './controllers/tasks.controller.js'
 import { createCategoriesController } from './controllers/categories.controller.js'
 
-const DEFAULT_ORIGINS = ['http://localhost:5173', 'https://d3pi0juuilndgb.cloudfront.net']
+const LOCAL_DEV_ORIGINS = ['http://localhost:5173']
 
 function getAllowedOrigins(): string[] {
   const env = process.env.ALLOWED_ORIGINS
-  if (!env) return DEFAULT_ORIGINS
+  if (!env) {
+    // 本番 origin はハードコードせず ALLOWED_ORIGINS で必ず明示注入させる（fail-closed）
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('ALLOWED_ORIGINS is not set in production; rejecting all cross-origin requests')
+      return []
+    }
+    return LOCAL_DEV_ORIGINS
+  }
   return env
     .split(',')
     .map((s) => s.trim())

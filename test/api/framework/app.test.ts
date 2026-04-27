@@ -105,14 +105,28 @@ describe('CORS', () => {
     expect(res.headers.get('vary')?.toLowerCase()).toContain('origin')
   })
 
-  it('allowed origin (CloudFront) is echoed back', async () => {
-    const res = await req('/api/tasks', {
-      method: 'OPTIONS',
-      origin: 'https://d3pi0juuilndgb.cloudfront.net',
-    })
-    expect(res.headers.get('access-control-allow-origin')).toBe(
-      'https://d3pi0juuilndgb.cloudfront.net',
-    )
+  it('production origin must be injected via ALLOWED_ORIGINS (not hardcoded)', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://app.example.com'
+    try {
+      const res = await req('/api/tasks', { method: 'OPTIONS', origin: 'https://app.example.com' })
+      expect(res.headers.get('access-control-allow-origin')).toBe('https://app.example.com')
+    } finally {
+      delete process.env.ALLOWED_ORIGINS
+    }
+  })
+
+  it('production with no ALLOWED_ORIGINS is fail-closed (rejects all)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const prevNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    delete process.env.ALLOWED_ORIGINS
+    try {
+      const res = await req('/api/tasks', { method: 'OPTIONS', origin: 'http://localhost:5173' })
+      expect(res.headers.get('access-control-allow-origin')).toBeNull()
+    } finally {
+      process.env.NODE_ENV = prevNodeEnv
+      warnSpy.mockRestore()
+    }
   })
 
   it('disallowed origin is NOT echoed back', async () => {
