@@ -26,7 +26,10 @@ beforeEach(() => {
     updatePassword: vi.fn(),
     delete: vi.fn(),
   }
-  passwords = { hash: vi.fn(), verify: vi.fn().mockResolvedValue(true) }
+  passwords = {
+    hash: vi.fn().mockResolvedValue('dummy-salt:dummy-hash'),
+    verify: vi.fn().mockResolvedValue(true),
+  }
   tokens = {
     issue: vi.fn().mockResolvedValue('test-token'),
     issueLongLived: vi.fn(),
@@ -52,11 +55,13 @@ describe('LoginInteractor', () => {
     if (!result.ok) expect(result.reason).toBe('invalid_input')
   })
 
-  it('ユーザーが見つからない場合は invalid_credentials', async () => {
+  it('ユーザーが見つからない場合も verify を呼んで時間差を消し invalid_credentials', async () => {
     users.findByEmail = vi.fn().mockResolvedValue(null)
     const result = await interactor.execute({ email: 'x@y.com', password: 'pw' })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('invalid_credentials')
+    // タイミングオラクル対策: ユーザー不在でも verify を実行している
+    expect(passwords.verify).toHaveBeenCalled()
   })
 
   it('パスワード不一致は invalid_credentials', async () => {

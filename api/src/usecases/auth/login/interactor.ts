@@ -6,6 +6,17 @@ import type { LoginOutput } from './output-port.js'
 
 const INVALID = 'メールアドレスまたはパスワードが正しくありません'
 
+// ユーザー不在時もダミーハッシュに対して verify を実行することで scrypt の
+// 計算時間を消費し、応答時間差から user enumeration されないようにする。
+// 起動時に一度だけ計算してキャッシュ。
+let dummyHashPromise: Promise<string> | null = null
+function getDummyHash(passwords: PasswordHashService): Promise<string> {
+  if (!dummyHashPromise) {
+    dummyHashPromise = passwords.hash('timing-attack-mitigation-placeholder')
+  }
+  return dummyHashPromise
+}
+
 export class LoginInteractor implements LoginUseCase {
   constructor(
     private readonly users: UserRepository,
@@ -19,10 +30,11 @@ export class LoginInteractor implements LoginUseCase {
     }
 
     const userRow = await this.users.findByEmail(input.email)
-    if (!userRow) return { ok: false, reason: 'invalid_credentials', message: INVALID }
-
-    const valid = await this.passwords.verify(input.password, userRow.passwordHash)
-    if (!valid) return { ok: false, reason: 'invalid_credentials', message: INVALID }
+    const hashToCheck = userRow?.passwordHash ?? (await getDummyHash(this.passwords))
+    const valid = await this.passwords.verify(input.password, hashToCheck)
+    if (!userRow || !valid) {
+      return { ok: false, reason: 'invalid_credentials', message: INVALID }
+    }
 
     const token = await this.tokens.issue(userRow.id)
     const { passwordHash: _ph, ...user } = userRow
