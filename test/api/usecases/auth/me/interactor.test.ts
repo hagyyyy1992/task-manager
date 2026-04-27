@@ -14,6 +14,7 @@ describe('MeInteractor', () => {
     const users = {
       findById: vi.fn().mockResolvedValue(mockUser),
       findByEmail: vi.fn(),
+      findByIdWithSecret: vi.fn(),
       create: vi.fn(),
       updatePassword: vi.fn(),
       delete: vi.fn(),
@@ -26,6 +27,7 @@ describe('MeInteractor', () => {
     const users = {
       findById: vi.fn().mockResolvedValue(null),
       findByEmail: vi.fn(),
+      findByIdWithSecret: vi.fn(),
       create: vi.fn(),
       updatePassword: vi.fn(),
       delete: vi.fn(),

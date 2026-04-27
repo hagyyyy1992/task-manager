@@ -7,6 +7,7 @@ describe('DeleteAccountInteractor', () => {
       delete: vi.fn().mockResolvedValue(true),
       findById: vi.fn(),
       findByEmail: vi.fn(),
+      findByIdWithSecret: vi.fn(),
       create: vi.fn(),
       updatePassword: vi.fn(),
     }
@@ -20,6 +21,7 @@ describe('DeleteAccountInteractor', () => {
       delete: vi.fn().mockResolvedValue(false),
       findById: vi.fn(),
       findByEmail: vi.fn(),
+      findByIdWithSecret: vi.fn(),
       create: vi.fn(),
       updatePassword: vi.fn(),
     }

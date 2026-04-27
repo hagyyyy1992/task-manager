@@ -18,8 +18,9 @@ let interactor: ChangePasswordInteractor
 
 beforeEach(() => {
   users = {
-    findByEmail: vi.fn().mockResolvedValue(mockSecret),
+    findByEmail: vi.fn(),
     findById: vi.fn().mockResolvedValue(mockMe),
+    findByIdWithSecret: vi.fn().mockResolvedValue(mockSecret),
     create: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(true),
     delete: vi.fn(),
@@ -51,8 +52,8 @@ describe('ChangePasswordInteractor', () => {
     if (!result.ok) expect(result.reason).toBe(reason)
   })
 
-  it('findById が null なら unauthorized', async () => {
-    users.findById = vi.fn().mockResolvedValue(null)
+  it('findByIdWithSecret が null なら unauthorized', async () => {
+    users.findByIdWithSecret = vi.fn().mockResolvedValue(null)
     const result = await interactor.execute({
       userId: 'u1',
       currentPassword: 'pw',
@@ -60,17 +61,6 @@ describe('ChangePasswordInteractor', () => {
     })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('unauthorized')
-  })
-
-  it('findByEmail が null なら not_found', async () => {
-    users.findByEmail = vi.fn().mockResolvedValue(null)
-    const result = await interactor.execute({
-      userId: 'u1',
-      currentPassword: 'pw',
-      newPassword: 'newpassword1',
-    })
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.reason).toBe('not_found')
   })
 
   it('パスワード不一致は wrong_password', async () => {

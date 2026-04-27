@@ -21,6 +21,7 @@ let interactor: LoginInteractor
 beforeEach(() => {
   users = {
     findByEmail: vi.fn().mockResolvedValue(mockSecret),
+    findByIdWithSecret: vi.fn(),
     findById: vi.fn(),
     create: vi.fn(),
     updatePassword: vi.fn(),

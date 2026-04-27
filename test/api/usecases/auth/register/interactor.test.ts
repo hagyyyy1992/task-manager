@@ -30,6 +30,7 @@ const validInput = {
 beforeEach(() => {
   users = {
     findByEmail: vi.fn().mockResolvedValue(null),
+    findByIdWithSecret: vi.fn(),
     findById: vi.fn(),
     create: vi.fn().mockResolvedValue(mockUser),
     updatePassword: vi.fn(),

@@ -25,11 +25,8 @@ export class ChangePasswordInteractor implements ChangePasswordUseCase {
       }
     }
 
-    const me = await this.users.findById(input.userId)
-    if (!me) return { ok: false, reason: 'unauthorized', message: 'unauthorized' }
-
-    const userRow = await this.users.findByEmail(me.email)
-    if (!userRow) return { ok: false, reason: 'not_found', message: 'user not found' }
+    const userRow = await this.users.findByIdWithSecret(input.userId)
+    if (!userRow) return { ok: false, reason: 'unauthorized', message: 'unauthorized' }
 
     const valid = await this.passwords.verify(input.currentPassword, userRow.passwordHash)
     if (!valid) {

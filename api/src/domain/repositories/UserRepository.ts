@@ -3,6 +3,7 @@ import type { User, UserWithSecret } from '../entities/User.js'
 export interface UserRepository {
   findByEmail(email: string): Promise<UserWithSecret | null>
   findById(id: string): Promise<User | null>
+  findByIdWithSecret(id: string): Promise<UserWithSecret | null>
   create(
     id: string,
     email: string,

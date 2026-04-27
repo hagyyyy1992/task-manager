@@ -382,6 +382,19 @@ describe('PrismaUserRepository', () => {
     expect(await repo.findById('x')).toBeNull()
   })
 
+  it('findByIdWithSecret: 取得して passwordHash 込みで返す', async () => {
+    prisma.user.findUnique.mockResolvedValue(userRow)
+    const repo = new PrismaUserRepository(prisma as unknown as never)
+    const u = await repo.findByIdWithSecret('u1')
+    expect(u?.passwordHash).toBe('h')
+  })
+
+  it('findByIdWithSecret: 無ければ null', async () => {
+    prisma.user.findUnique.mockResolvedValue(null)
+    const repo = new PrismaUserRepository(prisma as unknown as never)
+    expect(await repo.findByIdWithSecret('x')).toBeNull()
+  })
+
   it('create: termsAgreedAt 文字列を Date に変換', async () => {
     prisma.user.create.mockResolvedValue(userRow)
     const repo = new PrismaUserRepository(prisma as unknown as never)

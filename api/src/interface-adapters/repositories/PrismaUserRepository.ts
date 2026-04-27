@@ -30,6 +30,19 @@ export class PrismaUserRepository implements UserRepository {
     }
   }
 
+  async findByIdWithSecret(id: string): Promise<UserWithSecret | null> {
+    const u = await this.prisma.user.findUnique({ where: { id } })
+    if (!u) return null
+    return {
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      passwordHash: u.passwordHash,
+      createdAt: u.createdAt.toISOString(),
+      updatedAt: u.updatedAt.toISOString(),
+    }
+  }
+
   async create(
     id: string,
     email: string,
