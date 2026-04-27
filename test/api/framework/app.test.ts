@@ -164,6 +164,32 @@ describe('auth middleware', () => {
     expect((await res.json()).error).toBe('authentication required')
   })
 
+  it('POST without JSON Content-Type → 400', async () => {
+    const app = (await import('@api/framework/app.js')).buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain', 'content-length': '5' },
+        body: 'hello',
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/Content-Type/i)
+  })
+
+  it('POST with invalid JSON body → 400', async () => {
+    const app = (await import('@api/framework/app.js')).buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{not-json',
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/JSON/i)
+  })
+
   it('returns 401 when token is invalid', async () => {
     vi.mocked(container.tokens.verify).mockResolvedValue(null)
     const res = await req('/api/tasks')
