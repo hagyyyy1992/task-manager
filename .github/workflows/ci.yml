@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint / Typecheck / Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # lockfile が macOS 偏りで Linux 用 optional deps を欠いている場合に備え、
+        # npm ci 失敗時は npm install にフォールバックする（lockfile-check job で別途警告）。
+        run: npm ci || npm install --no-save
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (with coverage)
+        run: npm run test:cov
+
+  lockfile-check:
+    name: Lockfile multi-platform check
+    runs-on: ubuntu-latest
+    # 警告のみで PR をブロックしない（continue-on-error）。
+    # main にマージされる前に開発者が気づける状態にすることが目的。
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Detect lockfile drift for Linux x64 platform deps
+        run: |
+          npm install --include=optional --os=linux --cpu=x64 --package-lock-only
+          if ! git diff --exit-code package-lock.json; then
+            echo "::warning::package-lock.json は Linux x64 用の optional deps を欠いています。ローカルで以下を実行して push してください:"
+            echo "::warning::  npm install --include=optional --os=linux --cpu=x64 --package-lock-only"
+            exit 1
+          fi
