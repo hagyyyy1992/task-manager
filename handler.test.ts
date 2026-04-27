@@ -643,6 +643,21 @@ describe('PATCH /api/auth/password', () => {
     expect(res.statusCode).toBe(401)
     expect(JSON.parse(res.body).error).toContain('current password')
   })
+
+  it('returns 404 when findUserByEmail returns null（findUserById は通過したが email から引けない）', async () => {
+    vi.mocked(findUserById).mockResolvedValue(mockUser)
+    vi.mocked(findUserByEmail).mockResolvedValue(null)
+
+    const res = await handler(
+      event('PATCH', '/api/auth/password', {
+        currentPassword: 'password1234',
+        newPassword: 'newpassword5678',
+      }),
+    )
+
+    expect(res.statusCode).toBe(404)
+    expect(JSON.parse(res.body).error).toContain('user not found')
+  })
 })
 
 // ─── アカウント削除テスト ────────────────────────────────────────
@@ -840,6 +855,46 @@ describe('PATCH /api/categories/:id (重複名)', () => {
     const res = await handler(event('PATCH', '/api/categories/cat-sonota', { name: 'ゴミ箱' }))
     expect(res.statusCode).toBe(400)
     expect(JSON.parse(res.body).error).toContain('その他')
+  })
+})
+
+describe('POST /api/categories (sortOrder validation)', () => {
+  it('不正な sortOrder（負数）は 400 を返す', async () => {
+    const res = await handler(event('POST', '/api/categories', { name: 'x', sortOrder: -1 }))
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('sortOrder')
+  })
+
+  it('不正な sortOrder（浮動小数）は 400 を返す', async () => {
+    const res = await handler(event('POST', '/api/categories', { name: 'x', sortOrder: 1.5 }))
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('不正な sortOrder（文字列）は 400 を返す', async () => {
+    const res = await handler(
+      event('POST', '/api/categories', { name: 'x', sortOrder: 'one' as unknown as number }),
+    )
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+describe('handler の例外ハンドリング (5xx)', () => {
+  it('PATCH /api/categories/:id で予期せぬ例外は 500 を返す', async () => {
+    vi.mocked(updateCategory).mockRejectedValue(new Error('unknown db error'))
+    const res = await handler(event('PATCH', '/api/categories/cat123', { name: 'x' }))
+    expect(res.statusCode).toBe(500)
+  })
+
+  it('DELETE /api/categories/:id で予期せぬ例外は 500 を返す（CategoryProtectedError 以外）', async () => {
+    vi.mocked(deleteCategory).mockRejectedValue(new Error('unknown db error'))
+    const res = await handler(event('DELETE', '/api/categories/cat123'))
+    expect(res.statusCode).toBe(500)
+  })
+
+  it('PATCH /api/categories/reorder で予期せぬ例外は 500 を返す（CategoryReorderError 以外）', async () => {
+    vi.mocked(reorderCategories).mockRejectedValue(new Error('unknown db error'))
+    const res = await handler(event('PATCH', '/api/categories/reorder', { ids: ['a'] }))
+    expect(res.statusCode).toBe(500)
   })
 })
 
