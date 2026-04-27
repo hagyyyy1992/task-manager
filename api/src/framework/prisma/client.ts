@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../../../front/src/generated/prisma/client.js'
+import { PrismaClient } from '../../generated/prisma/client.js'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { readFileSync, existsSync } from 'fs'
 import { dirname, join } from 'path'
