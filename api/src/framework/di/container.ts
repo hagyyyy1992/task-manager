@@ -24,6 +24,7 @@ import { DeleteCategoryInteractor } from '../../usecases/categories/delete/inter
 import { ReorderCategoriesInteractor } from '../../usecases/categories/reorder/interactor.js'
 
 import type { TokenService } from '../../domain/services/TokenService.js'
+import type { UserRepository } from '../../domain/repositories/UserRepository.js'
 import type { RegisterUseCase } from '../../usecases/auth/register/input-port.js'
 import type { LoginUseCase } from '../../usecases/auth/login/input-port.js'
 import type { MeUseCase } from '../../usecases/auth/me/input-port.js'
@@ -41,6 +42,8 @@ import type { ReorderCategoriesUseCase } from '../../usecases/categories/reorder
 
 export interface Container {
   tokens: TokenService
+  // auth.middleware が JWT 失効判定 (passwordChangedAt vs iat) で利用 (issue #36)
+  users: UserRepository
   register: RegisterUseCase
   login: LoginUseCase
   me: MeUseCase
@@ -82,6 +85,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
 
   return {
     tokens,
+    users: userRepo,
     register: new RegisterInteractor(
       userRepo,
       categoryRepo,

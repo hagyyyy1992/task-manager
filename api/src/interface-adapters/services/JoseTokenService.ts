@@ -35,7 +35,10 @@ export class JoseTokenService implements TokenService {
       // 旧トークン（scope claim 無し）は session として扱う
       const rawScope = payload.scope
       const scope: TokenScope = rawScope === 'mcp' ? 'mcp' : 'session'
-      return { userId, scope }
+      // iat 欠落は設計上ありえない (issue/issueLongLived は必ず setIssuedAt を呼ぶ) が、
+      // 念のため 0 を返すと middleware 側で「変更日時より昔」と判定 → 失効させる
+      const issuedAt = typeof payload.iat === 'number' ? payload.iat : 0
+      return { userId, scope, issuedAt }
     } catch {
       return null
     }

@@ -13,6 +13,7 @@ export class PrismaUserRepository implements UserRepository {
       email: u.email,
       name: u.name,
       passwordHash: u.passwordHash,
+      passwordChangedAt: u.passwordChangedAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString(),
       updatedAt: u.updatedAt.toISOString(),
     }
@@ -25,6 +26,7 @@ export class PrismaUserRepository implements UserRepository {
       id: u.id,
       email: u.email,
       name: u.name,
+      passwordChangedAt: u.passwordChangedAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString(),
       updatedAt: u.updatedAt.toISOString(),
     }
@@ -38,6 +40,7 @@ export class PrismaUserRepository implements UserRepository {
       email: u.email,
       name: u.name,
       passwordHash: u.passwordHash,
+      passwordChangedAt: u.passwordChangedAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString(),
       updatedAt: u.updatedAt.toISOString(),
     }
@@ -66,6 +69,7 @@ export class PrismaUserRepository implements UserRepository {
       id: u.id,
       email: u.email,
       name: u.name,
+      passwordChangedAt: u.passwordChangedAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString(),
       updatedAt: u.updatedAt.toISOString(),
     }
@@ -74,9 +78,12 @@ export class PrismaUserRepository implements UserRepository {
   async updatePassword(id: string, passwordHash: string): Promise<boolean> {
     const existing = await this.prisma.user.findUnique({ where: { id } })
     if (!existing) return false
+    const now = new Date()
+    // passwordChangedAt は auth middleware が JWT iat と比較して
+    // 変更前に発行されたトークンを失効させる基準点 (issue #36)
     await this.prisma.user.update({
       where: { id },
-      data: { passwordHash, updatedAt: new Date() },
+      data: { passwordHash, passwordChangedAt: now, updatedAt: now },
     })
     return true
   }

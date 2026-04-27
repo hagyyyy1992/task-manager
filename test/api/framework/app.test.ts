@@ -20,10 +20,13 @@ const mockTask: Task = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 
+const nowSec = () => Math.floor(Date.now() / 1000)
+
 const mockUser = {
   id: 'user123',
   email: 'test@example.com',
   name: 'Test User',
+  passwordChangedAt: null as string | null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -42,13 +45,20 @@ function makeContainer(): Container {
   const tokens: TokenService = {
     issue: vi.fn().mockResolvedValue('test-token'),
     issueLongLived: vi.fn().mockResolvedValue('test-long-token'),
-    verify: vi.fn().mockResolvedValue({ userId: 'user123', scope: 'session' }),
+    // 既定では現時点で発行された session トークン扱い (passwordChangedAt 失効テスト以外は素通り)
+    verify: vi.fn().mockResolvedValue({ userId: 'user123', scope: 'session', issuedAt: nowSec() }),
+  }
+
+  // auth.middleware が削除済みユーザー / passwordChangedAt 判定で findById を叩くため最低限スタブする
+  const users = {
+    findById: vi.fn().mockResolvedValue(mockUser),
   }
 
   const usecase = <T = unknown>(execute: T) => ({ execute })
 
   return {
     tokens,
+    users,
     register: usecase(vi.fn()),
     login: usecase(vi.fn()),
     me: usecase(vi.fn()),
@@ -198,7 +208,11 @@ describe('auth middleware', () => {
   })
 
   it('PATCH with no body → 400 (controller does not 500 on missing body)', async () => {
-    vi.mocked(container.tokens.verify).mockResolvedValue({ userId: 'user123', scope: 'session' })
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: nowSec(),
+    })
     const app = (await import('@api/framework/app.js')).buildApp({ container })
     const res = await app.fetch(
       new Request('http://localhost/api/tasks/abc', {
@@ -211,7 +225,11 @@ describe('auth middleware', () => {
   })
 
   it('DELETE /api/auth/account with no body → 400 invalid_input (not 500)', async () => {
-    vi.mocked(container.tokens.verify).mockResolvedValue({ userId: 'user123', scope: 'session' })
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: nowSec(),
+    })
     vi.mocked(container.deleteAccount.execute).mockResolvedValue({
       ok: false,
       reason: 'invalid_input',
@@ -236,10 +254,94 @@ describe('auth middleware', () => {
   })
 
   it('returns 403 when MCP token is used against UI endpoints', async () => {
-    vi.mocked(container.tokens.verify).mockResolvedValue({ userId: 'user123', scope: 'mcp' })
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'mcp',
+      issuedAt: nowSec(),
+    })
     const res = await req('/api/tasks')
     expect(res.status).toBe(403)
     expect((await res.json()).error).toBe('token scope not allowed for this endpoint')
+  })
+
+  // issue #36: passwordChangedAt より前に発行された JWT は失効扱い (grace window 5s 越え)
+  it('returns 401 when token iat is clearly older than user.passwordChangedAt (>5s)', async () => {
+    const passwordChangedAt = new Date('2026-04-27T10:00:00.000Z')
+    vi.mocked(container.users.findById).mockResolvedValue({
+      ...mockUser,
+      passwordChangedAt: passwordChangedAt.toISOString(),
+    })
+    // iat = passwordChangedAt の 10 秒前 → grace window (5s) を超えて失効
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 10,
+    })
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(401)
+    expect((await res.json()).error).toBe('invalid or expired token')
+  })
+
+  it('accepts token issued at the same instant as passwordChangedAt (boundary)', async () => {
+    const passwordChangedAt = new Date('2026-04-27T10:00:00.000Z')
+    vi.mocked(container.users.findById).mockResolvedValue({
+      ...mockUser,
+      passwordChangedAt: passwordChangedAt.toISOString(),
+    })
+    // iat * 1000 == passwordChangedAt → 受理
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000),
+    })
+    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(200)
+  })
+
+  // codex 指摘 #2: 同一秒内・サブ秒精度差での誤判定がないことを担保 (PR #44)
+  // - passwordChangedAt が 10:00:00.900 の場合、「同秒・後ms」に発行された新トークン
+  //   (iat=10:00:00) は受理されるべき。秒切捨て比較により誤 401 にならないことを検証。
+  it('accepts new token issued in the same second but later ms than passwordChangedAt', async () => {
+    const passwordChangedAt = new Date('2026-04-27T10:00:00.900Z') // .900ms
+    vi.mocked(container.users.findById).mockResolvedValue({
+      ...mockUser,
+      passwordChangedAt: passwordChangedAt.toISOString(),
+    })
+    // 新トークン発行時刻 10:00:00.950Z → iat = floor(.../1000) = 10:00:00 (秒)
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000), // = 10:00:00
+    })
+    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(200)
+  })
+
+  // codex 指摘 #2: clock skew 5 秒以内であれば旧トークンも受理される (Lambda 時計ずれ吸収)
+  it('accepts token issued up to 5s before passwordChangedAt (clock skew grace)', async () => {
+    const passwordChangedAt = new Date('2026-04-27T10:00:00.000Z')
+    vi.mocked(container.users.findById).mockResolvedValue({
+      ...mockUser,
+      passwordChangedAt: passwordChangedAt.toISOString(),
+    })
+    // iat = passwordChangedAt の 5 秒前 (境界、grace 内)
+    vi.mocked(container.tokens.verify).mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 5,
+    })
+    vi.mocked(container.listTasks.execute).mockResolvedValue([])
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(200)
+  })
+
+  it('returns 401 when user has been deleted (findById returns null)', async () => {
+    vi.mocked(container.users.findById).mockResolvedValue(null)
+    const res = await req('/api/tasks')
+    expect(res.status).toBe(401)
+    expect((await res.json()).error).toBe('invalid or expired token')
   })
 })
 
