@@ -92,6 +92,15 @@ describe('tasks API', () => {
     await expect(loadTasks()).rejects.toThrow('Failed to load tasks: 500')
   })
 
+  // codex 指摘 #3: バックエンド異常で同 cursor が再出現した場合の無限ループ防止
+  it('loadTasks: 同じ cursor が再出現したら cursor loop エラーで止まる', async () => {
+    fetchMock
+      .mockResolvedValueOnce(ok({ items: [mockTask], nextCursor: 'c1' }))
+      .mockResolvedValueOnce(ok({ items: [{ ...mockTask, id: 't2' }], nextCursor: 'c1' }))
+    await expect(loadTasks()).rejects.toThrow('cursor loop detected')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('loadTask: 該当 ID が見つかればそれを返す', async () => {
     fetchMock.mockResolvedValue(
       ok({ items: [mockTask, { ...mockTask, id: 't2' }], nextCursor: null }),

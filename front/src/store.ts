@@ -13,18 +13,32 @@ interface TaskListPage {
 // 既存 UI は全件前提なので cursor を辿って結合する。100件超えで複数往復になるが
 // 現状のユーザー規模では通常 1 ページで完了する。将来「もっと読む」UI を入れたら
 // 単一ページ取得に切り替える。
+//
+// 安全策 (codex レビュー指摘):
+// - 同 cursor 再出現で fetch ループに入る異常系を弾く (バックエンド bug 対策)
+// - 最大ページ数 100 でハードリミット。limit=100 想定で 10,000 件まで対応、
+//   それ以上は明示的にエラーで止めて気付ける状態にする
+const MAX_PAGES = 100
 export async function loadTasks(): Promise<Task[]> {
   const all: Task[] = []
   let cursor: string | undefined
-  do {
+  const seen = new Set<string>()
+  for (let page = 0; page < MAX_PAGES; page++) {
+    if (cursor !== undefined) {
+      if (seen.has(cursor)) {
+        throw new Error('Failed to load tasks: cursor loop detected')
+      }
+      seen.add(cursor)
+    }
     const url = cursor ? `${API}?cursor=${encodeURIComponent(cursor)}` : API
     const res = await fetch(url, { headers: authHeaders() })
     if (!res.ok) throw new Error(`Failed to load tasks: ${res.status}`)
-    const page = (await res.json()) as TaskListPage
-    all.push(...page.items)
-    cursor = page.nextCursor ?? undefined
-  } while (cursor)
-  return all
+    const body = (await res.json()) as TaskListPage
+    all.push(...body.items)
+    if (body.nextCursor == null) return all
+    cursor = body.nextCursor
+  }
+  throw new Error(`Failed to load tasks: exceeded ${MAX_PAGES} pages`)
 }
 
 export async function loadTask(id: string): Promise<Task | null> {
