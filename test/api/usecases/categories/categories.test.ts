@@ -74,6 +74,26 @@ describe('CreateCategoryInteractor', () => {
       if (!result.ok) expect(result.message).toContain('sortOrder')
     },
   )
+
+  it('100 文字超の name は invalid_input', async () => {
+    const repo = makeRepo()
+    const result = await new CreateCategoryInteractor(repo).execute({
+      userId: 'u1',
+      name: 'x'.repeat(101),
+    })
+    expect(result.ok).toBe(false)
+    expect(repo.create).not.toHaveBeenCalled()
+  })
+
+  it('改行を含む name は invalid_input', async () => {
+    const repo = makeRepo()
+    const result = await new CreateCategoryInteractor(repo).execute({
+      userId: 'u1',
+      name: 'foo\nbar',
+    })
+    expect(result.ok).toBe(false)
+    expect(repo.create).not.toHaveBeenCalled()
+  })
 })
 
 describe('UpdateCategoryInteractor', () => {

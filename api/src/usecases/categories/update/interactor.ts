@@ -3,6 +3,7 @@ import { CategoryProtectedError } from '../../../domain/exceptions/CategoryProte
 import { CategoryDuplicateError } from '../../../domain/exceptions/CategoryDuplicateError.js'
 import type { UpdateCategoryInput, UpdateCategoryUseCase } from './input-port.js'
 import type { UpdateCategoryOutput } from './output-port.js'
+import { CATEGORY_NAME_MAX } from '../validators.js'
 
 function isValidSortOrder(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
@@ -28,6 +29,16 @@ export class UpdateCategoryInteractor implements UpdateCategoryUseCase {
     const trimmedName = input.name?.trim()
     if (input.name !== undefined && !trimmedName) {
       return { ok: false, reason: 'invalid_input', message: 'name is required' }
+    }
+    if (trimmedName !== undefined && trimmedName.length > CATEGORY_NAME_MAX) {
+      return {
+        ok: false,
+        reason: 'invalid_input',
+        message: `name must be at most ${CATEGORY_NAME_MAX} characters`,
+      }
+    }
+    if (trimmedName !== undefined && /[\r\n\0]/.test(trimmedName)) {
+      return { ok: false, reason: 'invalid_input', message: 'name contains invalid characters' }
     }
     if (input.sortOrder !== undefined && !isValidSortOrder(input.sortOrder)) {
       return { ok: false, reason: 'invalid_input', message: 'invalid sortOrder' }
