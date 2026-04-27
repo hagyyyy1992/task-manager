@@ -230,6 +230,71 @@ describe('App (タスク一覧)', () => {
   })
 })
 
+describe('App - DnD', () => {
+  let capturedOnDragEnd:
+    | ((e: { active: { id: string }; over: { id: string } | null }) => void)
+    | null = null
+
+  beforeEach(() => {
+    capturedOnDragEnd = null
+    vi.resetModules()
+    vi.doMock('@dnd-kit/core', async () => {
+      const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core')
+      return {
+        ...actual,
+        DndContext: ({
+          children,
+          onDragEnd,
+        }: {
+          children: React.ReactNode
+          onDragEnd: (e: { active: { id: string }; over: { id: string } | null }) => void
+        }) => {
+          capturedOnDragEnd = onDragEnd
+          return <>{children}</>
+        },
+      }
+    })
+  })
+
+  async function setup() {
+    const { default: AppPage } = await import('./App')
+    return render(
+      <MemoryRouter>
+        <AppPage />
+      </MemoryRouter>,
+    )
+  }
+
+  it('handleDragEnd: over=null は何もしない', async () => {
+    await setup()
+    await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
+    capturedOnDragEnd!({ active: { id: 't1' }, over: null })
+    // 例外無く終わる
+    expect(screen.getByText('タスクA')).toBeInTheDocument()
+  })
+
+  it('handleDragEnd: 通常の入れ替えで sortKey が manual になる', async () => {
+    await setup()
+    await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
+    await act(async () => {
+      capturedOnDragEnd!({ active: { id: 't1' }, over: { id: 't2' } })
+    })
+    const sortSelect = screen
+      .getAllByRole('combobox')
+      .find((s) =>
+        Array.from((s as HTMLSelectElement).options).some((o) => o.value === 'manual'),
+      ) as HTMLSelectElement
+    expect(sortSelect.value).toBe('manual')
+  })
+
+  it('handleDragEnd: 同 ID は入れ替え無しで終わる', async () => {
+    await setup()
+    await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
+    capturedOnDragEnd!({ active: { id: 't1' }, over: { id: 't1' } })
+    expect(screen.getByText('タスクA')).toBeInTheDocument()
+  })
+})
+
 describe('App (ソート分岐)', () => {
   it('期限順でソートできる（dueDate あり/なしの混在）', async () => {
     vi.mocked(loadTasks).mockResolvedValue([

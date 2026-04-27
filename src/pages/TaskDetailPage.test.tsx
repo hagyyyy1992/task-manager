@@ -278,6 +278,38 @@ describe('TaskDetailPage', () => {
     expect(apiUpdateTask).not.toHaveBeenCalled()
   })
 
+  it('編集中: メモ・期限・カテゴリ select・status・priority 変更で各 setter が動く', async () => {
+    vi.mocked(loadTask).mockResolvedValue(mockTask)
+    vi.mocked(apiUpdateTask).mockResolvedValue(mockTask)
+    renderWithRouter('task1')
+    await waitFor(() => expect(screen.getByText('テストタスク')).toBeInTheDocument())
+    fireEvent.click(screen.getAllByText('編集').find((el) => el.closest('header'))!)
+    await screen.findByDisplayValue('テストタスク')
+
+    // メモ
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    fireEvent.change(textarea, { target: { value: 'new memo' } })
+    expect(textarea.value).toBe('new memo')
+
+    // 期限
+    const date = document.querySelector('input[type="date"]') as HTMLInputElement
+    fireEvent.change(date, { target: { value: '2026-12-31' } })
+    expect(date.value).toBe('2026-12-31')
+
+    // ステータス select
+    const selects = document.querySelectorAll('select')
+    fireEvent.change(selects[0], { target: { value: 'done' } })
+    expect((selects[0] as HTMLSelectElement).value).toBe('done')
+
+    // 優先度 select
+    fireEvent.change(selects[1], { target: { value: 'high' } })
+    expect((selects[1] as HTMLSelectElement).value).toBe('high')
+
+    // カテゴリ select
+    fireEvent.change(selects[2], { target: { value: 'その他' } })
+    expect((selects[2] as HTMLSelectElement).value).toBe('その他')
+  })
+
   it('編集中: 新規カテゴリ入力の ✕ で既存選択に戻る', async () => {
     vi.mocked(loadTask).mockResolvedValue(mockTask)
     renderWithRouter('task1')
