@@ -29,6 +29,20 @@ if (verified.scope !== 'mcp') {
 }
 const userId = verified.userId
 
+// task-app HTTP API は cursor pagination だが、MCP は AI エージェント用に
+// 全タスクを返したいので、ここで cursor を辿って全件結合する小ヘルパを置く。
+// (MCP は規模小な個人タスクが対象なので毎回全件で問題ない)
+async function listAllTasks(filter: { userId: string; status?: string; category?: string }) {
+  const all: Task[] = []
+  let cursor: string | undefined
+  do {
+    const page = await taskRepo.list({ ...filter, cursor })
+    all.push(...page.items)
+    cursor = page.nextCursor ?? undefined
+  } while (cursor)
+  return all
+}
+
 const currentUser = await userRepo.findById(userId)
 if (!currentUser) {
   throw new Error('TASK_APP_TOKEN のユーザーが DB に存在しません')
@@ -70,7 +84,7 @@ server.tool(
     category: z.string().optional().describe('フィルタするカテゴリ'),
   },
   async ({ status, category }) => {
-    const tasks = await taskRepo.list({ userId, status, category })
+    const tasks = await listAllTasks({ userId, status, category })
     if (tasks.length === 0) {
       return { content: [{ type: 'text', text: 'タスクはありません' }] }
     }
@@ -175,7 +189,7 @@ server.tool(
       .describe('削除対象タスクのタイトル。実際のタイトルと一致しない場合は削除されない'),
   },
   async ({ id, expectedTitle }) => {
-    const tasks = await taskRepo.list({ userId })
+    const tasks = await listAllTasks({ userId })
     const target = tasks.find((t) => t.id === id)
     if (!target) {
       return {

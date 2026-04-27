@@ -30,11 +30,19 @@ function makeRepo(overrides: Partial<TaskRepository> = {}): TaskRepository {
 }
 
 describe('ListTasksInteractor', () => {
-  it('repo.list({userId}) を呼ぶ', async () => {
-    const repo = makeRepo({ list: vi.fn().mockResolvedValue([mockTask]) })
-    const out = await new ListTasksInteractor(repo).execute('u1')
-    expect(out).toEqual([mockTask])
-    expect(repo.list).toHaveBeenCalledWith({ userId: 'u1' })
+  it('repo.list({userId, cursor, limit}) を呼ぶ', async () => {
+    const page = { items: [mockTask], nextCursor: null }
+    const repo = makeRepo({ list: vi.fn().mockResolvedValue(page) })
+    const out = await new ListTasksInteractor(repo).execute({ userId: 'u1' })
+    expect(out).toEqual(page)
+    expect(repo.list).toHaveBeenCalledWith({ userId: 'u1', cursor: undefined, limit: undefined })
+  })
+
+  it('cursor / limit を repo へ素通しする', async () => {
+    const page = { items: [mockTask], nextCursor: 'next' }
+    const repo = makeRepo({ list: vi.fn().mockResolvedValue(page) })
+    await new ListTasksInteractor(repo).execute({ userId: 'u1', cursor: 'abc', limit: 50 })
+    expect(repo.list).toHaveBeenCalledWith({ userId: 'u1', cursor: 'abc', limit: 50 })
   })
 })
 

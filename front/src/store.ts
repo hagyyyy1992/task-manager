@@ -4,10 +4,27 @@ import { authHeaders } from './auth'
 const API = '/api/tasks'
 const CATEGORIES_API = '/api/categories'
 
+interface TaskListPage {
+  items: Task[]
+  nextCursor: string | null
+}
+
+// バックエンドは cursor pagination (issue #40) で 1 ページ最大 100 件。
+// 既存 UI は全件前提なので cursor を辿って結合する。100件超えで複数往復になるが
+// 現状のユーザー規模では通常 1 ページで完了する。将来「もっと読む」UI を入れたら
+// 単一ページ取得に切り替える。
 export async function loadTasks(): Promise<Task[]> {
-  const res = await fetch(API, { headers: authHeaders() })
-  if (!res.ok) throw new Error(`Failed to load tasks: ${res.status}`)
-  return await res.json()
+  const all: Task[] = []
+  let cursor: string | undefined
+  do {
+    const url = cursor ? `${API}?cursor=${encodeURIComponent(cursor)}` : API
+    const res = await fetch(url, { headers: authHeaders() })
+    if (!res.ok) throw new Error(`Failed to load tasks: ${res.status}`)
+    const page = (await res.json()) as TaskListPage
+    all.push(...page.items)
+    cursor = page.nextCursor ?? undefined
+  } while (cursor)
+  return all
 }
 
 export async function loadTask(id: string): Promise<Task | null> {

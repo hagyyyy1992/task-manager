@@ -6,8 +6,17 @@ export function createTasksController(container: Container) {
   const app = new Hono<AuthEnv>()
 
   app.get('/', async (c) => {
-    const tasks = await container.listTasks.execute(c.get('userId'))
-    return c.json(tasks, 200)
+    // cursor pagination (issue #40)。?cursor= / ?limit= 未指定でも動作 (1ページ目を返す)
+    const cursor = c.req.query('cursor') || undefined
+    const limitRaw = c.req.query('limit')
+    let limit: number | undefined
+    if (limitRaw !== undefined) {
+      const parsed = Number(limitRaw)
+      // 数値以外 / 0以下 / NaN は無視 → repo 側のデフォルト (100) に委ねる
+      if (Number.isFinite(parsed) && parsed > 0) limit = Math.floor(parsed)
+    }
+    const page = await container.listTasks.execute({ userId: c.get('userId'), cursor, limit })
+    return c.json(page, 200)
   })
 
   app.post('/', async (c) => {

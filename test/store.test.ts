@@ -65,11 +65,26 @@ describe('generateId', () => {
 })
 
 describe('tasks API', () => {
-  it('loadTasks: 成功', async () => {
-    fetchMock.mockResolvedValue(ok([mockTask]))
+  it('loadTasks: 成功 (1ページ目に nextCursor=null なので 1 リクエストで完了)', async () => {
+    fetchMock.mockResolvedValue(ok({ items: [mockTask], nextCursor: null }))
     const result = await loadTasks()
     expect(result).toEqual([mockTask])
     expect(fetchMock).toHaveBeenCalledWith('/api/tasks', expect.any(Object))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  // issue #40: cursor pagination 対応により、nextCursor がある間は次ページを取得して結合する
+  it('loadTasks: nextCursor がある間ループして全件取得する', async () => {
+    fetchMock
+      .mockResolvedValueOnce(ok({ items: [mockTask], nextCursor: 'c1' }))
+      .mockResolvedValueOnce(ok({ items: [{ ...mockTask, id: 't2' }], nextCursor: 'c2' }))
+      .mockResolvedValueOnce(ok({ items: [{ ...mockTask, id: 't3' }], nextCursor: null }))
+    const result = await loadTasks()
+    expect(result.map((t) => t.id)).toEqual(['t1', 't2', 't3'])
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/tasks')
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/tasks?cursor=c1')
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/tasks?cursor=c2')
   })
 
   it('loadTasks: 失敗時はエラー', async () => {
@@ -78,12 +93,14 @@ describe('tasks API', () => {
   })
 
   it('loadTask: 該当 ID が見つかればそれを返す', async () => {
-    fetchMock.mockResolvedValue(ok([mockTask, { ...mockTask, id: 't2' }]))
+    fetchMock.mockResolvedValue(
+      ok({ items: [mockTask, { ...mockTask, id: 't2' }], nextCursor: null }),
+    )
     expect(await loadTask('t2')).toEqual({ ...mockTask, id: 't2' })
   })
 
   it('loadTask: 見つからなければ null', async () => {
-    fetchMock.mockResolvedValue(ok([mockTask]))
+    fetchMock.mockResolvedValue(ok({ items: [mockTask], nextCursor: null }))
     expect(await loadTask('nope')).toBeNull()
   })
 
