@@ -7,6 +7,7 @@ interface Props {
   task: Task
   onStatusChange: (id: string, status: TaskStatus) => void
   onDelete: (id: string) => void
+  onTogglePin?: (id: string, pinned: boolean) => void
   isDraggable?: boolean
 }
 
@@ -47,7 +48,13 @@ function formatDueDate(dateStr: string | null): { text: string; overdue: boolean
   return { text: dateStr, overdue: false }
 }
 
-export function TaskItem({ task, onStatusChange, onDelete, isDraggable = false }: Props) {
+export function TaskItem({
+  task,
+  onStatusChange,
+  onDelete,
+  onTogglePin,
+  isDraggable = false,
+}: Props) {
   const navigate = useNavigate()
   const due = formatDueDate(task.dueDate)
   const isDone = task.status === 'done'
@@ -99,6 +106,11 @@ export function TaskItem({ task, onStatusChange, onDelete, isDraggable = false }
           <span
             className={`font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 ${isDone ? 'line-through' : ''}`}
           >
+            {task.pinned && (
+              <span className="mr-1 text-yellow-500" aria-label="ピン留め中">
+                📌
+              </span>
+            )}
             {task.title}
           </span>
           <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_COLORS[task.status]}`}>
@@ -129,6 +141,15 @@ export function TaskItem({ task, onStatusChange, onDelete, isDraggable = false }
       </div>
 
       <div className="shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onTogglePin && (
+          <button
+            onClick={() => onTogglePin(task.id, !task.pinned)}
+            className={`p-1 text-sm ${task.pinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'}`}
+            title={task.pinned ? 'ピン留めを解除' : 'ピン留めする'}
+          >
+            📌
+          </button>
+        )}
         <button
           onClick={() => navigate(`/task/${task.id}`)}
           className="text-gray-400 hover:text-blue-500 p-1 text-sm"

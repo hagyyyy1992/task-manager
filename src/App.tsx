@@ -76,6 +76,17 @@ function App() {
     }
   }, [])
 
+  const togglePin = useCallback(async (id: string, pinned: boolean) => {
+    const now = new Date().toISOString()
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, pinned, updatedAt: now } : t)))
+    try {
+      await apiUpdateTask(id, { pinned })
+    } catch (e) {
+      console.error(e)
+      loadTasks().then(setTasks).catch(console.error)
+    }
+  }, [])
+
   const filtered = tasks.filter((t) => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false
     if (filterCategory !== 'all' && t.category !== filterCategory) return false
@@ -87,9 +98,14 @@ function App() {
   })
 
   const displayTasks = useMemo(() => {
-    if (sortKey === 'manual') return filtered
+    // ピン留めは全体の最上部 (status/priority 分類を無視)。
+    // ピン内・非ピン内は既存ソート規則に従う。
+    const pinned = filtered.filter((t) => t.pinned)
+    const rest = filtered.filter((t) => !t.pinned)
 
-    return [...filtered].sort((a, b) => {
+    if (sortKey === 'manual') return [...pinned, ...rest]
+
+    const sortFn = (a: Task, b: Task) => {
       if (a.status === 'done' && b.status !== 'done') return 1
       if (a.status !== 'done' && b.status === 'done') return -1
 
@@ -119,7 +135,9 @@ function App() {
           return b.createdAt.localeCompare(a.createdAt)
         }
       }
-    })
+    }
+
+    return [...[...pinned].sort(sortFn), ...[...rest].sort(sortFn)]
   }, [filtered, sortKey])
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -256,6 +274,7 @@ function App() {
                     task={task}
                     onStatusChange={changeStatus}
                     onDelete={deleteTask}
+                    onTogglePin={togglePin}
                     isDraggable={sortKey === 'manual'}
                   />
                 ))

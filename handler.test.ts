@@ -80,6 +80,7 @@ const mockTask: Task = {
   category: 'その他',
   dueDate: null,
   memo: '',
+  pinned: false,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -210,6 +211,15 @@ describe('task endpoints', () => {
     expect(res.statusCode).toBe(200)
     expect(updateTask).toHaveBeenCalledWith('test123', { category: '新カテゴリ' }, 'user123')
     expect(JSON.parse(res.body).category).toBe('新カテゴリ')
+  })
+
+  it('PATCH /api/tasks/:id pinned を更新できる', async () => {
+    const updated = { ...mockTask, pinned: true }
+    vi.mocked(updateTask).mockResolvedValue(updated)
+    const res = await handler(event('PATCH', '/api/tasks/test123', { pinned: true }))
+    expect(res.statusCode).toBe(200)
+    expect(updateTask).toHaveBeenCalledWith('test123', { pinned: true }, 'user123')
+    expect(JSON.parse(res.body).pinned).toBe(true)
   })
 
   it('PATCH /api/tasks/:id returns 404 for unknown id', async () => {

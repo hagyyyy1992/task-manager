@@ -14,6 +14,7 @@ const baseTask: Task = {
   category: 'その他',
   dueDate: null,
   memo: '',
+  pinned: false,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -33,6 +34,7 @@ function wrap(task: Task, props: Partial<React.ComponentProps<typeof TaskItem>> 
                   task={task}
                   onStatusChange={onStatusChange}
                   onDelete={onDelete}
+                  onTogglePin={props.onTogglePin}
                   isDraggable={props.isDraggable}
                 />
               }
@@ -101,6 +103,27 @@ describe('TaskItem', () => {
     render(wrap(baseTask))
     fireEvent.click(screen.getByText('タスク'))
     expect(screen.getByTestId('detail')).toBeInTheDocument()
+  })
+
+  it('onTogglePin 未指定なら pin ボタンは出ない', () => {
+    render(wrap(baseTask))
+    expect(screen.queryByTitle(/ピン留め/)).toBeNull()
+  })
+
+  it('pin ボタンクリックで onTogglePin(id, !pinned) が呼ばれる', () => {
+    const onTogglePin = vi.fn()
+    render(wrap(baseTask, { onTogglePin }))
+    fireEvent.click(screen.getByTitle('ピン留めする'))
+    expect(onTogglePin).toHaveBeenCalledWith('t1', true)
+  })
+
+  it('pinned=true のタスクは 📌 マーカーを表示し、ボタンタイトルが解除になる', () => {
+    const onTogglePin = vi.fn()
+    render(wrap({ ...baseTask, pinned: true }, { onTogglePin }))
+    expect(screen.getByLabelText('ピン留め中')).toBeInTheDocument()
+    expect(screen.getByTitle('ピン留めを解除')).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('ピン留めを解除'))
+    expect(onTogglePin).toHaveBeenCalledWith('t1', false)
   })
 
   it('isDraggable=true でドラッグハンドルを表示する', () => {

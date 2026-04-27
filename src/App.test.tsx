@@ -31,6 +31,7 @@ const baseTask: Task = {
   category: '案件',
   dueDate: null,
   memo: '',
+  pinned: false,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -310,6 +311,54 @@ describe('App - DnD', () => {
     await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
     capturedOnDragEnd!({ active: { id: 't1' }, over: { id: 't1' } })
     expect(screen.getByText('タスクA')).toBeInTheDocument()
+  })
+})
+
+describe('App (ピン留め)', () => {
+  it('pinned のタスクは sortKey に関わらず最上部に表示される', async () => {
+    vi.mocked(loadTasks).mockResolvedValue([
+      { ...baseTask, id: 'p1', title: 'PinTask', pinned: true, status: 'done', priority: 'low' },
+      { ...baseTask, id: 'r1', title: 'Regular1', pinned: false, priority: 'high' },
+      { ...baseTask, id: 'r2', title: 'Regular2', pinned: false, priority: 'medium' },
+    ])
+    renderApp()
+    await waitFor(() => expect(screen.getByText('PinTask')).toBeInTheDocument())
+    // PinTask が完了/低優先度でも一番上
+    const pinEl = screen.getByText('PinTask')
+    const r1El = screen.getByText('Regular1')
+    expect(pinEl.compareDocumentPosition(r1El) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
+  it('ピン留めボタンクリックで apiUpdateTask({pinned: true}) が呼ばれる', async () => {
+    vi.mocked(apiUpdateTask).mockResolvedValue({ ...baseTask, pinned: true })
+    renderApp()
+    await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
+    // 最初の「ピン留めする」ボタンをクリック
+    const pinBtn = screen.getAllByTitle('ピン留めする')[0]
+    fireEvent.click(pinBtn)
+    await waitFor(() =>
+      expect(apiUpdateTask).toHaveBeenCalledWith(expect.any(String), { pinned: true }),
+    )
+  })
+
+  it('ピン解除ボタンクリックで apiUpdateTask({pinned: false}) が呼ばれる', async () => {
+    vi.mocked(loadTasks).mockResolvedValue([{ ...baseTask, pinned: true }])
+    vi.mocked(apiUpdateTask).mockResolvedValue({ ...baseTask, pinned: false })
+    renderApp()
+    await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
+    fireEvent.click(screen.getByTitle('ピン留めを解除'))
+    await waitFor(() => expect(apiUpdateTask).toHaveBeenCalledWith('t1', { pinned: false }))
+  })
+
+  it('ピン更新失敗時は loadTasks で再取得する', async () => {
+    vi.mocked(apiUpdateTask).mockRejectedValue(new Error('fail'))
+    renderApp()
+    await waitFor(() => expect(screen.getByText('タスクA')).toBeInTheDocument())
+    vi.mocked(loadTasks).mockClear()
+    fireEvent.click(screen.getAllByTitle('ピン留めする')[0])
+    await waitFor(() => expect(loadTasks).toHaveBeenCalled())
   })
 })
 

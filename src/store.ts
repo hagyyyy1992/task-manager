@@ -26,7 +26,9 @@ export async function apiCreateTask(task: Task): Promise<void> {
 
 export async function apiUpdateTask(
   id: string,
-  updates: Partial<Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category'>>,
+  updates: Partial<
+    Pick<Task, 'status' | 'priority' | 'title' | 'memo' | 'dueDate' | 'category' | 'pinned'>
+  >,
 ): Promise<Task> {
   const res = await fetch(`${API}/${id}`, {
     method: 'PATCH',

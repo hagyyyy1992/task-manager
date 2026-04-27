@@ -18,6 +18,7 @@ export interface Task {
   category: string
   dueDate: string | null
   memo: string
+  pinned: boolean
   createdAt: string
   updatedAt: string
 }
