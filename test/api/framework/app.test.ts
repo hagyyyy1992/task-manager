@@ -425,15 +425,42 @@ describe('PATCH /api/auth/password', () => {
 // ─── Auth: delete-account ────────────────────────────────────────
 
 describe('DELETE /api/auth/account', () => {
-  it('deletes account', async () => {
+  it('deletes account with currentPassword', async () => {
     vi.mocked(container.deleteAccount.execute).mockResolvedValue({ ok: true })
-    const res = await req('/api/auth/account', { method: 'DELETE' })
+    const res = await req('/api/auth/account', { method: 'DELETE', body: { currentPassword: 'p' } })
     expect(res.status).toBe(200)
+    expect(container.deleteAccount.execute).toHaveBeenCalledWith({
+      userId: 'user123',
+      currentPassword: 'p',
+    })
+  })
+
+  it('returns 401 when wrong password', async () => {
+    vi.mocked(container.deleteAccount.execute).mockResolvedValue({
+      ok: false,
+      reason: 'wrong_password',
+      message: 'current password is incorrect',
+    })
+    const res = await req('/api/auth/account', {
+      method: 'DELETE',
+      body: { currentPassword: 'wrong' },
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 400 when currentPassword missing', async () => {
+    vi.mocked(container.deleteAccount.execute).mockResolvedValue({
+      ok: false,
+      reason: 'invalid_input',
+      message: 'currentPassword is required',
+    })
+    const res = await req('/api/auth/account', { method: 'DELETE', body: {} })
+    expect(res.status).toBe(400)
   })
 
   it('returns 404 when user not found', async () => {
     vi.mocked(container.deleteAccount.execute).mockResolvedValue({ ok: false, reason: 'not_found' })
-    const res = await req('/api/auth/account', { method: 'DELETE' })
+    const res = await req('/api/auth/account', { method: 'DELETE', body: { currentPassword: 'p' } })
     expect(res.status).toBe(404)
   })
 })

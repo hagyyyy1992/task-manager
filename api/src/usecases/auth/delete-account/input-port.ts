@@ -1,3 +1,8 @@
+export interface DeleteAccountInput {
+  userId: string
+  currentPassword: string
+}
+
 export interface DeleteAccountUseCase {
-  execute(userId: string): Promise<import('./output-port.js').DeleteAccountOutput>
+  execute(input: DeleteAccountInput): Promise<import('./output-port.js').DeleteAccountOutput>
 }

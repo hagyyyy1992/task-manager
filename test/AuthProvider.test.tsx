@@ -34,7 +34,7 @@ function Probe() {
       <button onClick={() => login('a@a', 'pw')}>do-login</button>
       <button onClick={() => register('a@a', 'pw', 'n', true)}>do-register</button>
       <button onClick={() => logout()}>do-logout</button>
-      <button onClick={() => deleteAccount()}>do-delete</button>
+      <button onClick={() => deleteAccount('pw')}>do-delete</button>
     </div>
   )
 }

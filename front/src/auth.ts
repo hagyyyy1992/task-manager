@@ -96,12 +96,13 @@ export async function changePassword(currentPassword: string, newPassword: strin
   }
 }
 
-export async function deleteAccount(): Promise<void> {
+export async function deleteAccount(currentPassword: string): Promise<void> {
   const token = getToken()
   if (!token) return
   const res = await fetch(`${API}/account`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ currentPassword }),
   })
   if (!res.ok) {
     const err = await res.json()

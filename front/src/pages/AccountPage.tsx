@@ -10,6 +10,8 @@ export function AccountPage() {
   const navigate = useNavigate()
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -44,12 +46,17 @@ export function AccountPage() {
       setConfirming(true)
       return
     }
+    setDeleteError('')
+    if (!deletePassword) {
+      setDeleteError('現在のパスワードを入力してください')
+      return
+    }
     setDeleting(true)
     try {
-      await deleteAccount()
+      await deleteAccount(deletePassword)
       navigate('/login')
     } catch (e) {
-      console.error(e)
+      setDeleteError(e instanceof Error ? e.message : 'Failed')
       setDeleting(false)
     }
   }
@@ -158,9 +165,25 @@ export function AccountPage() {
             アカウントを削除すると、元に戻すことはできません。
           </p>
           {confirming && (
-            <p className="text-sm text-red-600 mb-3 font-medium">
-              本当に削除しますか？もう一度押すと削除されます。
-            </p>
+            <>
+              <p className="text-sm text-red-600 mb-3 font-medium">
+                本当に削除しますか？確認のため現在のパスワードを入力してください。
+              </p>
+              <div className="mb-3">
+                <PasswordInput
+                  label="現在のパスワード"
+                  value={deletePassword}
+                  onChange={setDeletePassword}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+              {deleteError && (
+                <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400 rounded-lg px-3 py-2 mb-3">
+                  {deleteError}
+                </div>
+              )}
+            </>
           )}
           <button
             onClick={handleDelete}
@@ -175,7 +198,11 @@ export function AccountPage() {
           </button>
           {confirming && !deleting && (
             <button
-              onClick={() => setConfirming(false)}
+              onClick={() => {
+                setConfirming(false)
+                setDeletePassword('')
+                setDeleteError('')
+              }}
               className="ml-2 px-4 py-2 text-gray-500 hover:text-gray-700 text-sm"
             >
               キャンセル

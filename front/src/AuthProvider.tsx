@@ -39,8 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
-  const deleteAccount = useCallback(async () => {
-    await apiDeleteAccount()
+  const deleteAccount = useCallback(async (currentPassword: string) => {
+    await apiDeleteAccount(currentPassword)
     setUser(null)
   }, [])
 

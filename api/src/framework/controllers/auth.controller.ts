@@ -64,9 +64,15 @@ export function createAuthController(container: Container) {
   })
 
   protectedRoutes.delete('/account', async (c) => {
-    const result = await container.deleteAccount.execute(c.get('userId'))
+    const body = await c.req.json<{ currentPassword?: string }>()
+    const result = await container.deleteAccount.execute({
+      userId: c.get('userId'),
+      currentPassword: body.currentPassword ?? '',
+    })
     if (result.ok) return c.json({ message: 'account deleted' }, 200)
-    return c.json({ error: 'user not found' }, 404)
+    const status =
+      result.reason === 'invalid_input' ? 400 : result.reason === 'wrong_password' ? 401 : 404
+    return c.json({ error: result.message ?? 'user not found' }, status)
   })
 
   app.route('/', protectedRoutes)

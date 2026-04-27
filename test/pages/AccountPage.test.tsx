@@ -112,13 +112,20 @@ describe('AccountPage', () => {
     await waitFor(() => expect(screen.getByText('Failed')).toBeInTheDocument())
   })
 
-  it('削除ボタンを2回押すと deleteAccount が呼ばれ /login へ遷移', async () => {
+  it('削除ボタンを2回押し、現行パスワードを入れて再度押すと deleteAccount が呼ばれ /login へ遷移', async () => {
     deleteAccountMock.mockResolvedValue(undefined)
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: 'アカウントを削除' }))
     expect(screen.getByText(/本当に削除しますか/)).toBeInTheDocument()
+    // パスワード未入力で押すとエラー、deleteAccount は呼ばれない
     fireEvent.click(screen.getByRole('button', { name: '本当に削除する' }))
-    await waitFor(() => expect(deleteAccountMock).toHaveBeenCalled())
+    expect(screen.getByText('現在のパスワードを入力してください')).toBeInTheDocument()
+    expect(deleteAccountMock).not.toHaveBeenCalled()
+    // パスワードを入れて再度
+    const pwInputs = document.querySelectorAll('input[type="password"]')
+    fireEvent.change(pwInputs[pwInputs.length - 1], { target: { value: 'mypassword' } })
+    fireEvent.click(screen.getByRole('button', { name: '本当に削除する' }))
+    await waitFor(() => expect(deleteAccountMock).toHaveBeenCalledWith('mypassword'))
     await waitFor(() => expect(screen.getByTestId('login')).toBeInTheDocument())
   })
 
@@ -130,12 +137,17 @@ describe('AccountPage', () => {
     expect(screen.queryByRole('button', { name: '本当に削除する' })).not.toBeInTheDocument()
   })
 
-  it('削除失敗時は deleting=false に戻り再度押せる', async () => {
-    deleteAccountMock.mockRejectedValue(new Error('fail'))
+  it('削除失敗時は deleting=false に戻り、エラー表示が出る', async () => {
+    deleteAccountMock.mockRejectedValue(new Error('current password is incorrect'))
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: 'アカウントを削除' }))
+    const pwInputs = document.querySelectorAll('input[type="password"]')
+    fireEvent.change(pwInputs[pwInputs.length - 1], { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: '本当に削除する' }))
     await waitFor(() => expect(deleteAccountMock).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(screen.getByText('current password is incorrect')).toBeInTheDocument(),
+    )
     // /login への遷移は起きない
     expect(screen.queryByTestId('login')).not.toBeInTheDocument()
   })

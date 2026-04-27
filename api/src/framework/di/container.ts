@@ -92,7 +92,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     login: new LoginInteractor(userRepo, passwords, tokens),
     me: new MeInteractor(userRepo),
     changePassword: new ChangePasswordInteractor(userRepo, passwords),
-    deleteAccount: new DeleteAccountInteractor(userRepo),
+    deleteAccount: new DeleteAccountInteractor(userRepo, passwords),
     listTasks: new ListTasksInteractor(taskRepo),
     createTask: new CreateTaskInteractor(taskRepo),
     updateTask: new UpdateTaskInteractor(taskRepo),

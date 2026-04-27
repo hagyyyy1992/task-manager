@@ -167,27 +167,29 @@ describe('changePassword', () => {
 
 describe('deleteAccount', () => {
   it('トークンが無ければ何もせず終了', async () => {
-    await deleteAccount()
+    await deleteAccount('pw')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('成功時は token を削除', async () => {
+  it('成功時は token を削除し、currentPassword をボディに含める', async () => {
     localStorage.setItem('token', 'tk')
     fetchMock.mockResolvedValue(ok({ message: 'deleted' }))
-    await deleteAccount()
+    await deleteAccount('pw')
     expect(localStorage.getItem('token')).toBeNull()
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(init.body).toBe(JSON.stringify({ currentPassword: 'pw' }))
   })
 
   it('失敗時はエラー（token は残る）', async () => {
     localStorage.setItem('token', 'tk')
     fetchMock.mockResolvedValue(ng(500, { error: 'oops' }))
-    await expect(deleteAccount()).rejects.toThrow('oops')
+    await expect(deleteAccount('pw')).rejects.toThrow('oops')
     expect(localStorage.getItem('token')).toBe('tk')
   })
 
   it('失敗時 error 無しは既定メッセージ', async () => {
     localStorage.setItem('token', 'tk')
     fetchMock.mockResolvedValue(ng(500, {}))
-    await expect(deleteAccount()).rejects.toThrow('Failed to delete account')
+    await expect(deleteAccount('pw')).rejects.toThrow('Failed to delete account')
   })
 })
