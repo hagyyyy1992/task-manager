@@ -75,6 +75,12 @@ export function LoginPage() {
             {submitting ? 'ログイン中...' : 'ログイン'}
           </button>
 
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+            <Link to="/forgot-password" className="text-blue-600 hover:underline">
+              パスワードをお忘れですか？
+            </Link>
+          </p>
+
           {import.meta.env.VITE_ALLOW_REGISTRATION === 'true' && (
             <p className="text-center text-sm text-gray-500 dark:text-gray-400">
               アカウントがない場合は{' '}
