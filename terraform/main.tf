@@ -181,7 +181,7 @@ resource "aws_cloudfront_function" "spa_routing" {
 
 resource "aws_cloudfront_response_headers_policy" "security" {
   name    = "${var.project_name}-security-headers"
-  comment = "HSTS / X-Content-Type-Options / X-Frame-Options / Referrer-Policy / CSP-Report-Only / Permissions-Policy を全レスポンスに付与"
+  comment = "HSTS / X-Content-Type-Options / X-Frame-Options / Referrer-Policy / CSP (enforce) / Permissions-Policy を全レスポンスに付与"
 
   security_headers_config {
     strict_transport_security {
@@ -204,25 +204,22 @@ resource "aws_cloudfront_response_headers_policy" "security" {
       referrer_policy = "strict-origin-when-cross-origin"
       override        = true
     }
+
+    # CSP enforce (issue #69)。Report-Only で違反ゼロ確認済みのため昇格。
+    # CloudFront の security_headers_config は enforce 専用 (Report-Only 不可)。
+    # style-src 'unsafe-inline': dnd-kit が CSS.Transform を style="" 属性に書き込むため必須。
+    # nonce は <style> ブロック専用で style="" 属性には効かないため、inline 排除は非現実的。
+    # report-uri: enforce 後も違反を CloudWatch へ記録し続ける監査目的で残す。
+    content_security_policy {
+      content_security_policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri /api/csp-report"
+      override                = true
+    }
   }
 
-  # CSP は段階導入: まず Report-Only で本番違反を観測 → 違反ゼロ確認後に
-  # Content-Security-Policy (enforce) に昇格させる別 PR を出す (issue #58)。
-  # style-src の 'unsafe-inline' は Tailwind ランタイム / React 互換のため
-  # 暫定で残す。enforce 化前に nonce 方式へ移行を検討。
-  #
   # override = true の運用方針: CSP / Permissions-Policy は CloudFront を
   # single source of truth とする。オリジン (Lambda) 側で同名ヘッダを返した
-  # 場合も CDN 側が上書きする。アプリ層で違反収集の試行錯誤をしたい場合は
-  # この override を一時的に false にするか、別の experimental ヘッダ名で
-  # 試すこと。
+  # 場合も CDN 側が上書きする。
   custom_headers_config {
-    items {
-      header   = "Content-Security-Policy-Report-Only"
-      override = true
-      value    = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri /api/csp-report"
-    }
-
     items {
       header   = "Permissions-Policy"
       override = true
