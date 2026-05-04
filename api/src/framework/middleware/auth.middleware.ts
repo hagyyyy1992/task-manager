@@ -10,6 +10,11 @@ export interface AuthMiddlewareOptions {
   allowedScopes?: TokenScope[]
 }
 
+// session scope の lastUsedAt 更新を間引く間隔 (issue #81)。
+// 5 分以内のリクエストでは DB write を skip する。監査用途では分単位の精度で十分で、
+// UI 通常トラフィックの DB 負荷を大きく削減できる。
+const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000
+
 export function createAuthMiddleware(
   tokens: TokenService,
   users: UserRepository,
@@ -66,10 +71,20 @@ export function createAuthMiddleware(
       ) {
         return c.json({ error: 'invalid or expired token' }, 401)
       }
-      // lastUsedAt は監査用。失敗しても認証フローは止めない (fire-and-forget)
-      tokenRepo.touchLastUsed(verified.jti, new Date()).catch((err) => {
-        console.warn('auth.touchLastUsed.failed', { err })
-      })
+      // lastUsedAt は監査用。失敗しても認証フローは止めない (fire-and-forget)。
+      // session scope は通常 UI トラフィックで全 API 呼び出しごとに DB write が発生するため、
+      // 最終更新から SESSION_TOUCH_INTERVAL_MS 以内なら skip して書き込みを間引く (issue #81)。
+      // mcp は監査用途として重要かつ頻度が低いので毎回更新する。
+      const now = new Date()
+      const shouldTouch =
+        verified.scope === 'mcp' ||
+        tokenRow.lastUsedAt === null ||
+        now.getTime() - new Date(tokenRow.lastUsedAt).getTime() >= SESSION_TOUCH_INTERVAL_MS
+      if (shouldTouch) {
+        tokenRepo.touchLastUsed(verified.jti, now).catch((err) => {
+          console.warn('auth.touchLastUsed.failed', { err })
+        })
+      }
     }
     c.set('userId', verified.userId)
     c.set('scope', verified.scope)
