@@ -80,7 +80,7 @@ export class PrismaTokenRepository implements TokenRepository {
     // userId あり → session logout (userId フィルタで他ユーザー保護 — issue #60)
     // userId なし → reset token single-use 化 (scope:'reset' フィルタで保護 — issue #66)
     const where = userId
-      ? { jti, userId, revokedAt: null }
+      ? { jti, userId, scope: 'session' as const, revokedAt: null }
       : { jti, scope: 'reset' as const, revokedAt: null }
     const result = await this.prisma.token.updateMany({
       where,

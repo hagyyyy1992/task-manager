@@ -629,7 +629,7 @@ describe('PrismaTokenRepository', () => {
     const repo = new PrismaTokenRepository(prisma as unknown as never)
     expect(await repo.revokeByJti('jti-sess', 'u1')).toBe(true)
     const args = prisma.token.updateMany.mock.calls[0][0]
-    expect(args.where).toEqual({ jti: 'jti-sess', userId: 'u1', revokedAt: null })
+    expect(args.where).toEqual({ jti: 'jti-sess', userId: 'u1', scope: 'session', revokedAt: null })
     expect(args.data.revokedAt).toBeInstanceOf(Date)
   })
 
