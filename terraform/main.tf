@@ -286,6 +286,37 @@ resource "aws_cloudfront_distribution" "main" {
     max_ttl     = 86400
   }
 
+  # /api ビヘイビア (完全一致): API Gateway (キャッシュ無効)
+  # /api 単独パスは ordered_cache_behavior の path_pattern が "/api/*" だけだとマッチせず
+  # default_cache_behavior (S3 SPA fallback) に流れて index.html を 200 で返してしまう (Issue #64)。
+  # AWS docs: ordered_cache_behavior の path_pattern は完全一致パスを指定可能
+  # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesPathPattern
+  ordered_cache_behavior {
+    path_pattern               = "/api"
+    target_origin_id           = "APIGW"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = false
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+
+    forwarded_values {
+      query_string = false
+      headers = [
+        "Content-Type",
+        "Authorization",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+      ]
+      cookies { forward = "none" }
+    }
+
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
+  }
+
   # /api/* ビヘイビア: API Gateway (キャッシュ無効)
   ordered_cache_behavior {
     path_pattern               = "/api/*"
