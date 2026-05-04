@@ -77,9 +77,9 @@ export class PrismaTokenRepository implements TokenRepository {
 
   async revokeByJti(jti: string): Promise<boolean> {
     // reset token (issue #66) を single-use 化するために jti 直指定で revoke。
-    // jti は UNIQUE INDEX なので 0 or 1 行のみ更新される。
+    // scope: 'reset' を WHERE に加えて mcp token を誤 revoke しない多層防御。
     const result = await this.prisma.token.updateMany({
-      where: { jti, revokedAt: null },
+      where: { jti, scope: 'reset', revokedAt: null },
       data: { revokedAt: new Date() },
     })
     return result.count > 0
