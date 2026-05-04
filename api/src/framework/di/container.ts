@@ -6,6 +6,7 @@ import { PrismaUserRepository } from '../../interface-adapters/repositories/Pris
 import { PrismaTokenRepository } from '../../interface-adapters/repositories/PrismaTokenRepository.js'
 import { ScryptPasswordHashService } from '../../interface-adapters/services/ScryptPasswordHashService.js'
 import { JoseTokenService } from '../../interface-adapters/services/JoseTokenService.js'
+import { HibpBreachedPasswordChecker } from '../../interface-adapters/services/HibpBreachedPasswordChecker.js'
 
 import { RegisterInteractor } from '../../usecases/auth/register/interactor.js'
 import { LoginInteractor } from '../../usecases/auth/login/interactor.js'
@@ -87,6 +88,9 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   const userRepo = new PrismaUserRepository(prisma)
   const tokenRepo = overrides.tokenRepo ?? new PrismaTokenRepository(prisma)
   const passwords = new ScryptPasswordHashService()
+  // HIBP Pwned Passwords k-Anonymity API で既知漏洩 PW を拒否 (issue #61)
+  // ネットワーク失敗時は fail-open (アプリ全停止を回避)
+  const breachedPasswordChecker = new HibpBreachedPasswordChecker()
   let tokens: TokenService
   if (overrides.tokens) {
     tokens = overrides.tokens
@@ -123,10 +127,16 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
       passwords,
       tokens,
       isRegistrationAllowed,
+      breachedPasswordChecker,
     ),
     login: new LoginInteractor(userRepo, passwords, tokens),
     me: new MeInteractor(userRepo),
-    changePassword: new ChangePasswordInteractor(userRepo, passwords, isDemoUser),
+    changePassword: new ChangePasswordInteractor(
+      userRepo,
+      passwords,
+      isDemoUser,
+      breachedPasswordChecker,
+    ),
     deleteAccount: new DeleteAccountInteractor(userRepo, passwords, isDemoUser),
     listMcpTokens: new ListMcpTokensInteractor(tokenRepo),
     issueMcpToken: new IssueMcpTokenInteractor(tokens, tokenRepo, isDemoUser),
