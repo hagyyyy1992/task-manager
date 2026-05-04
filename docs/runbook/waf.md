@@ -4,12 +4,12 @@ CloudFront 前段の AWS WAFv2 rate-limit ルールに関する運用 runbook。
 
 ## 対象 rule 一覧
 
-| rule name                  | 対象 path                                 | limit (5min/IP) | アラーム閾値   | 意図                                            |
-| -------------------------- | ----------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
-| `auth-rate-limit`          | `/api/auth/login`, `/api/auth/register`   | 100             | 10 blocks/5min | login/register のブルートフォース・列挙攻撃緩和 |
-| `auth-mutating-rate-limit` | `/api/auth/password`, `/api/auth/account` | 50              | 5 blocks/5min  | currentPassword 要求 API のブルートフォース緩和 |
-| `api-body-size-limit`      | `/api/*` (body > 64 KB)                   | —               | —              | edge での大量 body 弾き (多層防御)              |
-| `api-global-rate-limit`    | `/api/*` 全体                             | 2000            | —              | DDoS 緩衝                                       |
+| rule name                  | 対象 path                                 | limit (5min/IP) | アラーム閾値     | 意図                                            |
+| -------------------------- | ----------------------------------------- | --------------- | ---------------- | ----------------------------------------------- |
+| `auth-rate-limit`          | `/api/auth/login`, `/api/auth/register`   | 100             | 10 blocks/5min   | login/register のブルートフォース・列挙攻撃緩和 |
+| `auth-mutating-rate-limit` | `/api/auth/password`, `/api/auth/account` | 50              | 5 blocks/5min    | currentPassword 要求 API のブルートフォース緩和 |
+| `api-body-size-limit`      | `/api/*` (body > 64 KB)                   | —               | (アラーム未設定) | edge での大量 body 弾き (多層防御)              |
+| `api-global-rate-limit`    | `/api/*` 全体                             | 2000            | (アラーム未設定) | DDoS 緩衝                                       |
 
 定義: `terraform/waf.tf`
 
