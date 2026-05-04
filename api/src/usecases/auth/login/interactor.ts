@@ -1,7 +1,8 @@
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import type { UserRepository } from '../../../domain/repositories/UserRepository.js'
 import type { PasswordHashService } from '../../../domain/services/PasswordHashService.js'
 import type { TokenService } from '../../../domain/services/TokenService.js'
+import type { TokenRepository } from '../../../domain/repositories/TokenRepository.js'
 import type { LoginInput, LoginUseCase } from './input-port.js'
 import type { LoginOutput } from './output-port.js'
 
@@ -33,6 +34,7 @@ export class LoginInteractor implements LoginUseCase {
     private readonly users: UserRepository,
     private readonly passwords: PasswordHashService,
     private readonly tokens: TokenService,
+    private readonly tokenRepo: TokenRepository,
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
@@ -53,7 +55,15 @@ export class LoginInteractor implements LoginUseCase {
       return { ok: false, reason: 'invalid_credentials', message: INVALID }
     }
 
-    const token = await this.tokens.issue(userRow.id)
+    const jti = randomUUID()
+    const token = await this.tokens.issue(userRow.id, jti)
+    await this.tokenRepo.create({
+      id: randomUUID(),
+      userId: userRow.id,
+      scope: 'session',
+      jti,
+      label: '',
+    })
     const { passwordHash: _ph, ...user } = userRow
     void _ph
     console.info('auth.login.success', { userId: userRow.id })

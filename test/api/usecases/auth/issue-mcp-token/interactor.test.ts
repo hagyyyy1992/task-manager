@@ -17,6 +17,7 @@ function makeRepo() {
     listActiveByUser: vi.fn(),
     revoke: vi.fn(),
     revokeByJti: vi.fn(),
+    revokeAllByUserAndScope: vi.fn(),
     touchLastUsed: vi.fn(),
   }
 }

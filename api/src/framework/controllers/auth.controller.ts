@@ -145,6 +145,21 @@ export function createAuthController(container: Container) {
     return c.json({ error: result.message }, status)
   })
 
+  // session logout — 現在のセッショントークンを失効 (issue #60)
+  protectedRoutes.post('/logout', async (c) => {
+    const jti = c.get('jti')
+    if (!jti) return c.json({ error: 'jti required for session logout' }, 400)
+    const result = await container.logout.execute({ userId: c.get('userId'), jti })
+    if (result.ok) return c.json({ message: 'logged out' }, 200)
+    return c.json({ error: 'session not found' }, 404)
+  })
+
+  // 全セッション失効 (issue #60)
+  protectedRoutes.delete('/sessions', async (c) => {
+    const result = await container.revokeAllSessions.execute({ userId: c.get('userId') })
+    return c.json({ message: 'all sessions revoked', revokedCount: result.revokedCount }, 200)
+  })
+
   protectedRoutes.delete('/mcp-tokens/:id', async (c) => {
     const result = await container.revokeMcpToken.execute({
       userId: c.get('userId'),

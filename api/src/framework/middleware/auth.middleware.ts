@@ -3,7 +3,7 @@ import type { TokenScope, TokenService } from '../../domain/services/TokenServic
 import type { UserRepository } from '../../domain/repositories/UserRepository.js'
 import type { TokenRepository } from '../../domain/repositories/TokenRepository.js'
 
-export type AuthEnv = { Variables: { userId: string; scope: TokenScope } }
+export type AuthEnv = { Variables: { userId: string; scope: TokenScope; jti: string | null } }
 
 export interface AuthMiddlewareOptions {
   // 許可する scope。省略時は session のみ（=UI 通常ログイン）
@@ -45,15 +45,14 @@ export function createAuthMiddleware(
         return c.json({ error: 'invalid or expired token' }, 401)
       }
     }
-    // mcp scope は Token テーブルと突き合わせて個別失効を検査する (issue #37)。
-    // jti が無い旧 mcp トークン (PR #35〜本機構導入前に発行) は revoke 不能なので、
-    // セキュリティ上拒否し、再発行を強制する。
-    if (verified.scope === 'mcp') {
+    // mcp / session scope は Token テーブルと突き合わせて個別失効を検査する (issue #37, #60)。
+    if (verified.scope === 'mcp' || verified.scope === 'session') {
       if (!verified.jti) {
+        // jti が無い旧トークンは revoke 不能なので拒否し再発行を強制する
         return c.json(
           {
             error:
-              'mcp token without jti is no longer accepted; please re-issue from the account page',
+              'token without jti is no longer accepted; please re-login or re-issue from the account page',
           },
           401,
         )
@@ -67,6 +66,7 @@ export function createAuthMiddleware(
     }
     c.set('userId', verified.userId)
     c.set('scope', verified.scope)
+    c.set('jti', verified.jti)
     await next()
   }
 }

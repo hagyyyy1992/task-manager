@@ -11,9 +11,9 @@ export interface VerifiedToken {
 }
 
 export interface TokenService {
-  issue(userId: string): Promise<string>
-  // jti を呼び出し側で生成して渡す (DB の Token テーブルと同じ jti を JWT claim に埋め込むため)。
-  // session トークン側は短期 (7d) なので個別失効が必要なく、jti は不要。
+  // session トークン (7d)。jti を呼び出し側で渡し、DB の Token テーブルと突合可能にする (issue #60)。
+  issue(userId: string, jti: string): Promise<string>
+  // MCP 等の長期利用クライアント向け (90d)。jti は DB 突合用 (issue #37)。
   issueLongLived(userId: string, jti: string): Promise<string>
   verify(token: string): Promise<VerifiedToken | null>
 }

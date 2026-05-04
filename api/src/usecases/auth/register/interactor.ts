@@ -3,6 +3,7 @@ import type { UserRepository } from '../../../domain/repositories/UserRepository
 import type { CategoryRepository } from '../../../domain/repositories/CategoryRepository.js'
 import type { PasswordHashService } from '../../../domain/services/PasswordHashService.js'
 import type { TokenService } from '../../../domain/services/TokenService.js'
+import type { TokenRepository } from '../../../domain/repositories/TokenRepository.js'
 import type { BreachedPasswordChecker } from '../../../domain/services/BreachedPasswordChecker.js'
 import {
   PASSWORD_MAX,
@@ -23,6 +24,7 @@ export class RegisterInteractor implements RegisterUseCase {
     private readonly passwords: PasswordHashService,
     private readonly tokens: TokenService,
     private readonly isRegistrationAllowed: () => boolean,
+    private readonly tokenRepo: TokenRepository,
     private readonly breachedChecker?: BreachedPasswordChecker,
   ) {}
 
@@ -77,7 +79,15 @@ export class RegisterInteractor implements RegisterUseCase {
     const termsAgreedAt = new Date().toISOString()
     const user = await this.users.create(id, email, name, passwordHash, termsAgreedAt)
     await this.categories.seedDefaults(user.id)
-    const token = await this.tokens.issue(user.id)
+    const jti = randomUUID()
+    const token = await this.tokens.issue(user.id, jti)
+    await this.tokenRepo.create({
+      id: randomUUID(),
+      userId: user.id,
+      scope: 'session',
+      jti,
+      label: '',
+    })
 
     return { ok: true, user, token }
   }

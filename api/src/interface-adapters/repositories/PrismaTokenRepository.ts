@@ -16,7 +16,8 @@ interface DbTokenRow {
 function toEntity(row: DbTokenRow): Token {
   // scope は DB に文字列で保存しているため、未知値は防御的に 'mcp' fallback する
   // (異常データで Prisma 層が落ちないようにする。アプリ層は scope で分岐するので fallback でも安全)
-  const scope: TokenScope = row.scope === 'reset' ? 'reset' : 'mcp'
+  const scope: TokenScope =
+    row.scope === 'reset' ? 'reset' : row.scope === 'session' ? 'session' : 'mcp'
   return {
     id: row.id,
     userId: row.userId,
@@ -75,14 +76,25 @@ export class PrismaTokenRepository implements TokenRepository {
     return result.count > 0
   }
 
-  async revokeByJti(jti: string): Promise<boolean> {
-    // reset token (issue #66) を single-use 化するために jti 直指定で revoke。
-    // scope: 'reset' を WHERE に加えて mcp token を誤 revoke しない多層防御。
+  async revokeByJti(jti: string, userId?: string): Promise<boolean> {
+    // userId あり → session logout (userId フィルタで他ユーザー保護 — issue #60)
+    // userId なし → reset token single-use 化 (scope:'reset' フィルタで保護 — issue #66)
+    const where = userId
+      ? { jti, userId, revokedAt: null }
+      : { jti, scope: 'reset' as const, revokedAt: null }
     const result = await this.prisma.token.updateMany({
-      where: { jti, scope: 'reset', revokedAt: null },
+      where,
       data: { revokedAt: new Date() },
     })
     return result.count > 0
+  }
+
+  async revokeAllByUserAndScope(userId: string, scope: TokenScope): Promise<number> {
+    const result = await this.prisma.token.updateMany({
+      where: { userId, scope, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    return result.count
   }
 
   async touchLastUsed(jti: string, at: Date): Promise<void> {

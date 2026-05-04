@@ -9,11 +9,12 @@ export class JoseTokenService implements TokenService {
     this.secret = new TextEncoder().encode(secret)
   }
 
-  async issue(userId: string): Promise<string> {
+  async issue(userId: string, jti: string): Promise<string> {
     return new SignJWT({ sub: userId, scope: 'session' satisfies TokenScope })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('7d')
+      .setJti(jti)
       .sign(this.secret)
   }
 

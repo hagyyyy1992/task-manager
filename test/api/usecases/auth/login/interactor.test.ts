@@ -3,6 +3,7 @@ import { LoginInteractor } from '@api/usecases/auth/login/interactor.js'
 import type { UserRepository } from '@api/domain/repositories/UserRepository.js'
 import type { PasswordHashService } from '@api/domain/services/PasswordHashService.js'
 import type { TokenService } from '@api/domain/services/TokenService.js'
+import type { TokenRepository } from '@api/domain/repositories/TokenRepository.js'
 
 const mockSecret = {
   id: 'u1',
@@ -16,6 +17,7 @@ const mockSecret = {
 let users: UserRepository
 let passwords: PasswordHashService
 let tokens: TokenService
+let tokenRepo: TokenRepository
 let interactor: LoginInteractor
 
 beforeEach(() => {
@@ -36,7 +38,16 @@ beforeEach(() => {
     issueLongLived: vi.fn(),
     verify: vi.fn(),
   }
-  interactor = new LoginInteractor(users, passwords, tokens)
+  tokenRepo = {
+    create: vi.fn().mockResolvedValue({}),
+    findByJti: vi.fn(),
+    listActiveByUser: vi.fn(),
+    revoke: vi.fn(),
+    revokeByJti: vi.fn(),
+    revokeAllByUserAndScope: vi.fn(),
+    touchLastUsed: vi.fn(),
+  }
+  interactor = new LoginInteractor(users, passwords, tokens, tokenRepo)
 })
 
 describe('LoginInteractor', () => {

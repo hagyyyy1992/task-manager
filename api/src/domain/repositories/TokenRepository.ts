@@ -15,7 +15,11 @@ export interface TokenRepository {
   listActiveByUser(userId: string): Promise<Token[]>
   // 戻り値は revoke 成功フラグ。指定 id が他ユーザー所有 / 既に revoke 済み / 不在の場合は false
   revoke(id: string, userId: string): Promise<boolean>
-  // jti 直指定の revoke (reset token の single-use 化に使用 — issue #66)
-  revokeByJti(jti: string): Promise<boolean>
+  // jti 直指定の revoke。
+  // reset token → userId なし (scope:'reset' フィルタで保護 — issue #66)
+  // session logout → userId あり (userId フィルタで保護 — issue #60)
+  revokeByJti(jti: string, userId?: string): Promise<boolean>
+  // 指定ユーザーの指定 scope のアクティブトークンを一括 revoke (issue #60)
+  revokeAllByUserAndScope(userId: string, scope: TokenScope): Promise<number>
   touchLastUsed(jti: string, at: Date): Promise<void>
 }
