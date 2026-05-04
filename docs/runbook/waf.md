@@ -59,7 +59,7 @@ Log group: `aws-waf-logs-task-app-cloudfront` (us-east-1)
 **前提**: `terraform-apply.yml` workflow が走るのでローカル apply は不要。
 
 1. 対象 IP を確認 (ユーザーに `https://ipinfo.io` 等で確認してもらう)
-2. `terraform/waf.tf` の WAF rule 先頭 (priority=0 より前 = priority=-1 はないので、既存 rule の priority を 1 つずつ後ろにずらす) に IP allowlist rule を追加:
+2. `terraform/waf.tf` に IP allowlist rule を追加 (WAFv2 priority は 0 以上の整数のみで負値は使えないため、既存 rule の隙間 priority=1 を使う):
 
    ```hcl
    resource "aws_wafv2_ip_set" "emergency_allowlist" {
