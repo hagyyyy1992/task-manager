@@ -37,6 +37,25 @@ export function buildApp(options: BuildAppOptions = {}): Hono<AuthEnv> {
   // CORS allowlist は buildApp 時点で 1 度だけ評価する（per-request の env 再パースを回避）
   const allowedOrigins = getAllowedOrigins()
 
+  // 不許可 Origin の preflight (OPTIONS) を 403 で明示的に拒否する (issue #65)。
+  // 既存挙動: cors middleware は不許可 Origin に ACAO ヘッダーを付けないため
+  // ブラウザが弾く (= 実害なし) が、204 が返るためペネトレツール/偵察を助長する。
+  // CORS middleware より前に実行することで preflight を即時拒否する。
+  // O(n) 検索だが allowedOrigins は通常 1-2 件なので Set 化は不要 (将来 10+ になったら検討)。
+  // Origin ヘッダー無しの OPTIONS: 同一オリジンならブラウザは preflight を送らないため、
+  // ここに来るのは CLI/curl 等の CORS 無関係リクエスト → Hono のルート挙動 (404/200) に委ねる。
+  app.use('*', async (c, next) => {
+    if (c.req.method !== 'OPTIONS') return next()
+    const origin = c.req.header('origin')
+    if (!origin) return next()
+    if (!allowedOrigins.includes(origin)) {
+      // 拒否 origin は構造化ログに残す (OWASP A09)。レスポンスは判定根拠を露出しない汎用文言に留める
+      console.warn('cors.preflight.rejected', { origin })
+      return c.json({ error: 'forbidden' }, 403)
+    }
+    return next()
+  })
+
   app.use(
     '*',
     cors({
