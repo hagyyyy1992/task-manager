@@ -40,6 +40,8 @@ model Token {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  // revokeAllByUserAndScope (WHERE user_id=? AND scope=? AND revoked_at IS NULL) の高速化
+  @@index([userId, scope, revokedAt])
   @@map("tokens")
 }
 
