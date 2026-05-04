@@ -3,13 +3,18 @@ import type { UserRepository } from '../../../domain/repositories/UserRepository
 import type { CategoryRepository } from '../../../domain/repositories/CategoryRepository.js'
 import type { PasswordHashService } from '../../../domain/services/PasswordHashService.js'
 import type { TokenService } from '../../../domain/services/TokenService.js'
+import type { BreachedPasswordChecker } from '../../../domain/services/BreachedPasswordChecker.js'
+import {
+  PASSWORD_MAX,
+  validatePasswordStatic,
+  checkBreachedPassword,
+} from '../shared/password-policy.js'
 import type { RegisterInput, RegisterUseCase } from './input-port.js'
 import type { RegisterOutput } from './output-port.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const EMAIL_MAX = 254 // RFC 5321
 const NAME_MAX = 100
-const PASSWORD_MAX = 256
 
 export class RegisterInteractor implements RegisterUseCase {
   constructor(
@@ -18,6 +23,7 @@ export class RegisterInteractor implements RegisterUseCase {
     private readonly passwords: PasswordHashService,
     private readonly tokens: TokenService,
     private readonly isRegistrationAllowed: () => boolean,
+    private readonly breachedChecker?: BreachedPasswordChecker,
   ) {}
 
   async execute(input: RegisterInput): Promise<RegisterOutput> {
@@ -40,22 +46,25 @@ export class RegisterInteractor implements RegisterUseCase {
         message: `name must be at most ${NAME_MAX} characters`,
       }
     }
-    if (password.length < 8) {
-      return {
-        ok: false,
-        reason: 'invalid_input',
-        message: 'password must be at least 8 characters',
-      }
-    }
     if (password.length > PASSWORD_MAX) {
+      // 長さ上限のみ static チェック前に判定 (static でも返すが、メッセージを既存と揃える)
       return {
         ok: false,
         reason: 'invalid_input',
         message: `password must be at most ${PASSWORD_MAX} characters`,
       }
     }
+    const staticCheck = validatePasswordStatic({ password, email })
+    if (!staticCheck.ok) {
+      return { ok: false, reason: 'invalid_input', message: staticCheck.message }
+    }
     if (!input.termsAgreed) {
       return { ok: false, reason: 'terms_required', message: '利用規約への同意が必要です' }
+    }
+
+    const breachedCheck = await checkBreachedPassword(password, this.breachedChecker)
+    if (!breachedCheck.ok) {
+      return { ok: false, reason: 'invalid_input', message: breachedCheck.message }
     }
 
     const existing = await this.users.findByEmail(email)

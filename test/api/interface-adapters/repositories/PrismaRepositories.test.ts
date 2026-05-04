@@ -589,12 +589,13 @@ describe('PrismaTokenRepository', () => {
     expect(await repo.findByJti('jti-x')).toBeNull()
   })
 
-  it('listActiveByUser: revoked を除外して createdAt 降順で取得', async () => {
+  it("listActiveByUser: revoked を除外し scope='mcp' に絞って createdAt 降順で取得 (issue #66)", async () => {
     prisma.token.findMany.mockResolvedValue([tokenRow])
     const repo = new PrismaTokenRepository(prisma as unknown as never)
     await repo.listActiveByUser('u1')
+    // reset token (scope='reset') は UI 一覧に出さないため scope='mcp' で絞る
     expect(prisma.token.findMany).toHaveBeenCalledWith({
-      where: { userId: 'u1', revokedAt: null },
+      where: { userId: 'u1', revokedAt: null, scope: 'mcp' },
       orderBy: { createdAt: 'desc' },
     })
   })
@@ -612,6 +613,21 @@ describe('PrismaTokenRepository', () => {
     prisma.token.updateMany.mockResolvedValue({ count: 0 })
     const repo = new PrismaTokenRepository(prisma as unknown as never)
     expect(await repo.revoke('tok-x', 'u1')).toBe(false)
+  })
+
+  it('revokeByJti: jti 直指定で single-use 化 (issue #66 reset token)', async () => {
+    prisma.token.updateMany.mockResolvedValue({ count: 1 })
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    expect(await repo.revokeByJti('jti-1')).toBe(true)
+    const args = prisma.token.updateMany.mock.calls[0][0]
+    expect(args.where).toEqual({ jti: 'jti-1', scope: 'reset', revokedAt: null })
+    expect(args.data.revokedAt).toBeInstanceOf(Date)
+  })
+
+  it('revokeByJti: 該当 0 件 (race / 既 revoke / 不在) は false', async () => {
+    prisma.token.updateMany.mockResolvedValue({ count: 0 })
+    const repo = new PrismaTokenRepository(prisma as unknown as never)
+    expect(await repo.revokeByJti('jti-used')).toBe(false)
   })
 
   it('touchLastUsed: 例外を投げず updateMany のみ呼ぶ', async () => {

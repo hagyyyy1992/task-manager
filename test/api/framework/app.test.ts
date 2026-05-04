@@ -63,6 +63,7 @@ function makeContainer(): Container {
     listActiveByUser: vi.fn().mockResolvedValue([]),
     create: vi.fn(),
     revoke: vi.fn().mockResolvedValue(true),
+    revokeByJti: vi.fn().mockResolvedValue(true),
     touchLastUsed: vi.fn().mockResolvedValue(undefined),
   }
 
@@ -80,6 +81,8 @@ function makeContainer(): Container {
     listMcpTokens: usecase(vi.fn()),
     issueMcpToken: usecase(vi.fn()),
     revokeMcpToken: usecase(vi.fn()),
+    forgotPassword: usecase(vi.fn()),
+    resetPassword: usecase(vi.fn()),
     listTasks: usecase(vi.fn()),
     createTask: usecase(vi.fn()),
     updateTask: usecase(vi.fn()),
@@ -248,6 +251,22 @@ describe('auth middleware', () => {
     const res = await req('/api/tasks', { authenticated: false })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('authentication required')
+  })
+
+  it('POST with Content-Length > 64KB → 413 (issue #63)', async () => {
+    const app = (await import('@api/framework/app.js')).buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(64 * 1024 + 1),
+        },
+        body: JSON.stringify({ email: 'a@example.com', password: 'x' }),
+      }),
+    )
+    expect(res.status).toBe(413)
+    expect((await res.json()).error).toMatch(/payload too large/i)
   })
 
   it('POST without JSON Content-Type → 400', async () => {
@@ -480,6 +499,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -516,6 +536,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -543,6 +564,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -585,6 +607,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn().mockResolvedValue(undefined),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -830,6 +853,70 @@ describe('POST /api/auth/login', () => {
       body: { email: 'a@b.com', password: 'xxxxxxxx' },
     })
     expect(res.status).toBe(401)
+  })
+})
+
+// ─── Auth: forgot-password (issue #66) ───────────────────────────
+
+describe('POST /api/auth/forgot-password', () => {
+  it('実在ユーザー有無に関わらず ok 時は 200 を返す (email 列挙対策)', async () => {
+    vi.mocked(container.forgotPassword.execute).mockResolvedValue({ ok: true })
+    const res = await req('/api/auth/forgot-password', {
+      method: 'POST',
+      authenticated: false,
+      body: { email: 'a@b.com' },
+    })
+    expect(res.status).toBe(200)
+    expect(container.forgotPassword.execute).toHaveBeenCalledWith({ email: 'a@b.com' })
+  })
+
+  it('email 形式不正時のみ 400 (invalid_input)', async () => {
+    vi.mocked(container.forgotPassword.execute).mockResolvedValue({
+      ok: false,
+      reason: 'invalid_input',
+      message: 'invalid email format',
+    })
+    const res = await req('/api/auth/forgot-password', {
+      method: 'POST',
+      authenticated: false,
+      body: { email: 'not-an-email' },
+    })
+    expect(res.status).toBe(400)
+  })
+})
+
+// ─── Auth: reset-password (issue #66) ────────────────────────────
+
+describe('POST /api/auth/reset-password', () => {
+  it('正常な token + 新 PW で 200', async () => {
+    vi.mocked(container.resetPassword.execute).mockResolvedValue({ ok: true })
+    const res = await req('/api/auth/reset-password', {
+      method: 'POST',
+      authenticated: false,
+      body: { token: 'jti-x', newPassword: 'newpassword1' },
+    })
+    expect(res.status).toBe(200)
+    expect(container.resetPassword.execute).toHaveBeenCalledWith({
+      token: 'jti-x',
+      newPassword: 'newpassword1',
+    })
+  })
+
+  it.each([
+    ['invalid_input', 400],
+    ['invalid_token', 401],
+  ] as const)('reason=%s -> status %d', async (reason, status) => {
+    vi.mocked(container.resetPassword.execute).mockResolvedValue({
+      ok: false,
+      reason,
+      message: 'x',
+    })
+    const res = await req('/api/auth/reset-password', {
+      method: 'POST',
+      authenticated: false,
+      body: { token: 'x', newPassword: 'xxxxxxxx' },
+    })
+    expect(res.status).toBe(status)
   })
 })
 

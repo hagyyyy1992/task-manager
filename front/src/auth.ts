@@ -148,3 +148,29 @@ export async function revokeMcpToken(id: string): Promise<void> {
   })
   if (!res.ok) throw new Error(`Failed to revoke MCP token: ${res.status}`)
 }
+
+// ─── パスワードリセット (issue #66) ────────────────────────────────
+
+export async function forgotPassword(email: string): Promise<void> {
+  const res = await fetch(`${API}/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'リクエストに失敗しました')
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? 'パスワードのリセットに失敗しました')
+  }
+}

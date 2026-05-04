@@ -8,6 +8,7 @@ describe('RevokeMcpTokenInteractor', () => {
       findByJti: vi.fn(),
       listActiveByUser: vi.fn(),
       create: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const result = await new RevokeMcpTokenInteractor(repo).execute({ userId: 'u1', tokenId: 't1' })
@@ -21,6 +22,7 @@ describe('RevokeMcpTokenInteractor', () => {
       findByJti: vi.fn(),
       listActiveByUser: vi.fn(),
       create: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const result = await new RevokeMcpTokenInteractor(repo).execute({ userId: 'u1', tokenId: 't1' })
