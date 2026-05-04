@@ -49,9 +49,12 @@ resource "aws_wafv2_web_acl" "cloudfront" {
                 }
                 positional_constraint = "EXACTLY"
                 search_string         = "/api/auth/login"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
                 text_transformation {
                   priority = 0
-                  type     = "NONE"
+                  type     = "LOWERCASE"
                 }
               }
             }
@@ -62,9 +65,12 @@ resource "aws_wafv2_web_acl" "cloudfront" {
                 }
                 positional_constraint = "EXACTLY"
                 search_string         = "/api/auth/register"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
                 text_transformation {
                   priority = 0
-                  type     = "NONE"
+                  type     = "LOWERCASE"
                 }
               }
             }
@@ -80,12 +86,78 @@ resource "aws_wafv2_web_acl" "cloudfront" {
     }
   }
 
+  # /api/auth/password (PATCH) と /api/auth/account (DELETE) は認証通過後の
+  # 操作だが currentPassword を要求するため、トークン窃取後のブルートフォース
+  # 経路になる。login/register より頻度が低い (通常 1 ユーザー数回) ので
+  # 50 req / 5min / IP で絞る (issue #59)。
+  # HTTP method は不問 (GET/HEAD 等を含めて IP 単位で抑制)。method-aware に
+  # するには and_statement で byte_match_statement (HTTP method = PATCH/DELETE)
+  # を追加するが、過剰検証で誤検知リスクが上がるため意図的に不問とする。
+  rule {
+    name     = "auth-mutating-rate-limit"
+    priority = 2
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 50
+        aggregate_key_type = "IP"
+
+        scope_down_statement {
+          or_statement {
+            statement {
+              byte_match_statement {
+                field_to_match {
+                  uri_path {}
+                }
+                positional_constraint = "EXACTLY"
+                search_string         = "/api/auth/password"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
+                text_transformation {
+                  priority = 0
+                  type     = "LOWERCASE"
+                }
+              }
+            }
+            statement {
+              byte_match_statement {
+                field_to_match {
+                  uri_path {}
+                }
+                positional_constraint = "EXACTLY"
+                search_string         = "/api/auth/account"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
+                text_transformation {
+                  priority = 0
+                  type     = "LOWERCASE"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.project_name}-auth-mutating-rate-limit"
+      sampled_requests_enabled   = true
+    }
+  }
+
   # /api/* 全体の DDoS 緩衝。SPA の静的アセット (CloudFront S3 origin) は対象外。
   # しきい値は IP あたり 2000 req / 5min。共有 NAT/企業プロキシ配下で SPA を見るだけの
   # 通常利用は対象から外し、API レイヤの異常アクセスのみ落とす (codex review コメント対応)。
   rule {
     name     = "api-global-rate-limit"
-    priority = 1
+    priority = 3
 
     action {
       block {}
@@ -167,5 +239,27 @@ resource "aws_cloudwatch_metric_alarm" "waf_auth_blocks" {
     WebACL = aws_wafv2_web_acl.cloudfront.name
     Region = "CloudFront"
     Rule   = "auth-rate-limit"
+  }
+}
+
+# auth-mutating-rate-limit による block アラート (issue #59)。
+# password/account は通常頻度が低いので、5 分で 5 件超えたら異常。
+resource "aws_cloudwatch_metric_alarm" "waf_auth_mutating_blocks" {
+  provider            = aws.us_east_1
+  alarm_name          = "${var.project_name}-waf-auth-mutating-blocks"
+  alarm_description   = "WAF auth-mutating-rate-limit (password/account) による block が急増"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "BlockedRequests"
+  namespace           = "AWS/WAFV2"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 5
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    WebACL = aws_wafv2_web_acl.cloudfront.name
+    Region = "CloudFront"
+    Rule   = "auth-mutating-rate-limit"
   }
 }
