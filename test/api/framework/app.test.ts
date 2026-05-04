@@ -250,6 +250,22 @@ describe('auth middleware', () => {
     expect((await res.json()).error).toBe('authentication required')
   })
 
+  it('POST with Content-Length > 64KB → 413 (issue #63)', async () => {
+    const app = (await import('@api/framework/app.js')).buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(64 * 1024 + 1),
+        },
+        body: JSON.stringify({ email: 'a@example.com', password: 'x' }),
+      }),
+    )
+    expect(res.status).toBe(413)
+    expect((await res.json()).error).toMatch(/payload too large/i)
+  })
+
   it('POST without JSON Content-Type → 400', async () => {
     const app = (await import('@api/framework/app.js')).buildApp({ container })
     const res = await app.fetch(
