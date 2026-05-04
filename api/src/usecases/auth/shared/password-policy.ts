@@ -14,7 +14,9 @@ import type { BreachedPasswordChecker } from '../../../domain/services/BreachedP
 export const PASSWORD_MIN = 12
 export const PASSWORD_MAX = 256
 
-export type PasswordPolicyError = { ok: false; message: string } | { ok: true }
+export type PasswordPolicyResult =
+  | { ok: false; code: 'too_short' | 'too_long' | 'missing_character_type' | 'contains_email' | 'breached'; message: string }
+  | { ok: true }
 
 export interface ValidatePasswordOptions {
   password: string
@@ -26,21 +28,21 @@ export interface ValidatePasswordOptions {
  * 静的ルール (長さ・文字種・メール部分一致) のみを検証。
  * HIBP チェックは別途 `checkBreachedPassword` で実施 (テストの分離容易性のため)。
  */
-export function validatePasswordStatic(opts: ValidatePasswordOptions): PasswordPolicyError {
+export function validatePasswordStatic(opts: ValidatePasswordOptions): PasswordPolicyResult {
   const { password, email } = opts
   if (password.length < PASSWORD_MIN) {
-    return { ok: false, message: `password must be at least ${PASSWORD_MIN} characters` }
+    return { ok: false, code: 'too_short', message: `password must be at least ${PASSWORD_MIN} characters` }
   }
   if (password.length > PASSWORD_MAX) {
-    return { ok: false, message: `password must be at most ${PASSWORD_MAX} characters` }
+    return { ok: false, code: 'too_long', message: `password must be at most ${PASSWORD_MAX} characters` }
   }
   if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-    return { ok: false, message: 'password must contain both letters and digits' }
+    return { ok: false, code: 'missing_character_type', message: 'password must contain both letters and digits' }
   }
   if (email) {
     const localPart = email.split('@')[0]?.trim().toLowerCase()
     if (localPart && localPart.length >= 3 && password.toLowerCase().includes(localPart)) {
-      return { ok: false, message: 'password must not contain your email local part' }
+      return { ok: false, code: 'contains_email', message: 'password must not contain your email local part' }
     }
   }
   return { ok: true }
@@ -54,13 +56,14 @@ export function validatePasswordStatic(opts: ValidatePasswordOptions): PasswordP
 export async function checkBreachedPassword(
   password: string,
   checker: BreachedPasswordChecker | undefined,
-): Promise<PasswordPolicyError> {
+): Promise<PasswordPolicyResult> {
   if (!checker) return { ok: true }
   try {
     const breached = await checker.isBreached(password)
     if (breached) {
       return {
         ok: false,
+        code: 'breached',
         message: 'this password has appeared in a known data breach; please choose another',
       }
     }
