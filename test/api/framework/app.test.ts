@@ -209,6 +209,17 @@ describe('CORS', () => {
     expect(res.headers.get('access-control-allow-origin')).toBeNull()
   })
 
+  it('disallowed origin の preflight は 403 を返す (issue #65)', async () => {
+    const res = await req('/api/tasks', { method: 'OPTIONS', origin: 'https://evil.example.com' })
+    expect(res.status).toBe(403)
+    expect(res.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it('Origin ヘッダー無しの OPTIONS は 403 にせず通常処理 (CLI/同一オリジン)', async () => {
+    const res = await req('/api/tasks', { method: 'OPTIONS' })
+    expect(res.status).not.toBe(403)
+  })
+
   it('missing origin: no Access-Control-Allow-Origin', async () => {
     const res = await req('/api/tasks', { method: 'OPTIONS' })
     expect(res.headers.get('access-control-allow-origin')).toBeNull()
