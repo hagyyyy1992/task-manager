@@ -181,7 +181,7 @@ resource "aws_cloudfront_function" "spa_routing" {
 
 resource "aws_cloudfront_response_headers_policy" "security" {
   name    = "${var.project_name}-security-headers"
-  comment = "HSTS / X-Content-Type-Options / X-Frame-Options / Referrer-Policy を全レスポンスに付与"
+  comment = "HSTS / X-Content-Type-Options / X-Frame-Options / Referrer-Policy / CSP-Report-Only / Permissions-Policy を全レスポンスに付与"
 
   security_headers_config {
     strict_transport_security {
@@ -206,8 +206,29 @@ resource "aws_cloudfront_response_headers_policy" "security" {
     }
   }
 
-  # CSP は controlled rollout（Report-Only で挙動検証 → 本番適用）が必要なため、
-  # このPRではスコープ外。別Issue で対応する。
+  # CSP は段階導入: まず Report-Only で本番違反を観測 → 違反ゼロ確認後に
+  # Content-Security-Policy (enforce) に昇格させる別 PR を出す (issue #58)。
+  # style-src の 'unsafe-inline' は Tailwind ランタイム / React 互換のため
+  # 暫定で残す。enforce 化前に nonce 方式へ移行を検討。
+  #
+  # override = true の運用方針: CSP / Permissions-Policy は CloudFront を
+  # single source of truth とする。オリジン (Lambda) 側で同名ヘッダを返した
+  # 場合も CDN 側が上書きする。アプリ層で違反収集の試行錯誤をしたい場合は
+  # この override を一時的に false にするか、別の experimental ヘッダ名で
+  # 試すこと。
+  custom_headers_config {
+    items {
+      header   = "Content-Security-Policy-Report-Only"
+      override = true
+      value    = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri /api/csp-report"
+    }
+
+    items {
+      header   = "Permissions-Policy"
+      override = true
+      value    = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=(), browsing-topics=()"
+    }
+  }
 }
 
 # ─── CloudFront Distribution ─────────────────────────────────────────────────

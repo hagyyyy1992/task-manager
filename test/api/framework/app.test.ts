@@ -122,6 +122,55 @@ beforeEach(() => {
   process.env.ALLOW_REGISTRATION = 'true'
 })
 
+// ─── CSP report endpoint (issue #58) ─────────────────────────────
+
+describe('POST /api/csp-report', () => {
+  it('application/csp-report を 204 で受理し violation をログに残す', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const app = buildApp({ container })
+    const reportBody = JSON.stringify({ 'csp-report': { 'violated-directive': 'script-src' } })
+    const res = await app.fetch(
+      new Request('http://localhost/api/csp-report', {
+        method: 'POST',
+        headers: { 'content-type': 'application/csp-report', 'user-agent': 'test-ua' },
+        body: reportBody,
+      }),
+    )
+    expect(res.status).toBe(204)
+    expect(warn).toHaveBeenCalledWith(
+      'csp.violation',
+      expect.objectContaining({ ua: 'test-ua' }),
+    )
+    warn.mockRestore()
+  })
+
+  it('壊れた JSON でも 204 を返す (ブラウザリトライ抑止)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const app = buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/csp-report', {
+        method: 'POST',
+        headers: { 'content-type': 'application/csp-report' },
+        body: 'not json{{',
+      }),
+    )
+    expect(res.status).toBe(204)
+  })
+
+  it('application/json でも受理する (Reporting API 互換 fallback)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const app = buildApp({ container })
+    const res = await app.fetch(
+      new Request('http://localhost/api/csp-report', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'csp-violation' }),
+      }),
+    )
+    expect(res.status).toBe(204)
+  })
+})
+
 // ─── CORS ────────────────────────────────────────────────────────
 
 describe('CORS', () => {

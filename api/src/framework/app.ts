@@ -51,6 +51,24 @@ export function buildApp(options: BuildAppOptions = {}): Hono<AuthEnv> {
   // ボディを伴う request の Content-Type と JSON 妥当性を一括検査して 400 を返す
   app.use('/api/*', createJsonBodyMiddleware())
 
+  // CSP-Report-Only の違反レポート受信口 (issue #58)。
+  // ブラウザは Content-Type: application/csp-report で {"csp-report": {...}} を POST する。
+  // 認証不要 (どのオリジンからでも観測したいため)、レスポンスは 204 で固定。
+  // 受信内容は警告ログに残し、CloudWatch Logs Insights で集計する想定。
+  app.post('/api/csp-report', async (c) => {
+    let body: unknown = null
+    try {
+      body = await c.req.json()
+    } catch {
+      // 壊れたレポートでも 204 を返す (ブラウザ側のリトライを避けるため)
+    }
+    console.warn('csp.violation', {
+      ua: c.req.header('user-agent') ?? null,
+      report: body,
+    })
+    return c.body(null, 204)
+  })
+
   app.route('/api/auth', createAuthController(container))
 
   // /api/tasks, /api/categories は全エンドポイント認証必須
