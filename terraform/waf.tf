@@ -9,6 +9,40 @@ provider "aws" {
   region = "us-east-1"
 }
 
+locals {
+  # WAF rule の name 値。Dashboard widget の metrics dimensions Rule に使う (issue #71)。
+  # 既存アラーム (waf_auth_blocks, waf_auth_mutating_blocks) の dimensions と同じ
+  # 命名規則 (var.project_name プレフィックスなし、rule の name 属性そのまま)。
+  waf_rule_names = [
+    "auth-rate-limit",
+    "auth-mutating-rate-limit",
+    "api-body-size-limit",
+    "api-global-rate-limit",
+  ]
+
+  # Dashboard widget の metrics 配列 (CloudWatch Dashboard JSON 仕様の
+  # `[Namespace, MetricName, DimName, DimValue, ...]` フラット配列)。
+  # 同じ shape を 3 widget で再利用するため locals に切り出して DRY 化。
+  waf_block_metrics = [
+    for rule in local.waf_rule_names : [
+      "AWS/WAFV2",
+      "BlockedRequests",
+      "WebACL", aws_wafv2_web_acl.cloudfront.name,
+      "Rule", rule,
+      "Region", "CloudFront",
+    ]
+  ]
+  waf_allow_metrics = [
+    for rule in local.waf_rule_names : [
+      "AWS/WAFV2",
+      "AllowedRequests",
+      "WebACL", aws_wafv2_web_acl.cloudfront.name,
+      "Rule", rule,
+      "Region", "CloudFront",
+    ]
+  ]
+}
+
 resource "aws_wafv2_web_acl" "cloudfront" {
   provider = aws.us_east_1
   name     = "${var.project_name}-cloudfront-acl"
@@ -335,4 +369,74 @@ resource "aws_cloudwatch_metric_alarm" "waf_auth_mutating_blocks" {
     Region = "CloudFront"
     Rule   = "auth-mutating-rate-limit"
   }
+}
+
+# ─── CloudWatch Dashboard: 誤検知監視 (issue #71) ────────────────────────────
+# 全 rule の BlockedRequests を可視化し、observation 期間 (2-4w) での誤検知率測定と
+# 閾値見直しに使う。runbook (docs/runbook/waf.md) からこの dashboard を参照する。
+#
+# CloudFront scope の WAF メトリクスは us-east-1 リージョンに publish されるため、
+# widget 内の properties.region = "us-east-1" が必須。dashboard リソース自体の
+# リージョンは表示には関係ないが、provider alias を us_east_1 に揃える。
+#
+# Region 次元値は CloudFront scope では "CloudFront" を使う (既存アラームと同値)。
+# rule 名一覧は locals.waf_rule_names (ファイル冒頭) を参照。
+resource "aws_cloudwatch_dashboard" "waf" {
+  provider       = aws.us_east_1
+  dashboard_name = "${var.project_name}-waf-monitoring"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 24
+        height = 8
+        properties = {
+          title   = "WAF BlockedRequests by Rule (last 24h, 5min sum)"
+          view    = "timeSeries"
+          stacked = false
+          region  = "us-east-1"
+          stat    = "Sum"
+          period  = 300
+          metrics = local.waf_block_metrics
+          yAxis   = { left = { min = 0 } }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 8
+        width  = 24
+        height = 6
+        properties = {
+          title   = "WAF AllowedRequests by Rule (last 24h, 5min sum) — false-positive 検出用"
+          view    = "timeSeries"
+          stacked = false
+          region  = "us-east-1"
+          stat    = "Sum"
+          period  = 300
+          metrics = local.waf_allow_metrics
+          yAxis   = { left = { min = 0 } }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 14
+        width  = 24
+        height = 6
+        properties = {
+          title   = "WAF BlockedRequests by Rule (last 30d, 1h sum) — 閾値見直し用"
+          view    = "timeSeries"
+          region  = "us-east-1"
+          stat    = "Sum"
+          period  = 3600
+          metrics = local.waf_block_metrics
+          yAxis   = { left = { min = 0 } }
+        }
+      },
+    ]
+  })
 }
