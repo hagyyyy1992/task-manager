@@ -5,10 +5,13 @@ import type { Mailer } from '../../domain/services/Mailer.js'
 // 本番環境では SesMailer (follow-up issue) に差し替える。
 //
 // セキュリティ注意:
-// - email は構造化ログに残るため、本番ログ収集対象に含める場合は PII 取り扱いに注意。
-//   本実装は dev/staging のみで使う前提。SES_ENABLED=true で本番は SesMailer を使う設計。
+// - reset token を構造化ログ (JSON) に含めない。ログ集約基盤に token が混入するのを防ぐ。
+//   開発者確認用のリンクは平文行として別途出力し、JSON ログ収集対象外とする前提。
 export class LogMailer implements Mailer {
   async sendPasswordReset(email: string, link: string): Promise<void> {
-    console.info('mail.password_reset.dev', { email, link })
+    // 構造化ログには email のみ。token は含めない
+    console.info('mail.password_reset.dev', { email })
+    // 開発者向けリンク (JSON ログ集約の対象外)
+    console.info(`[LogMailer] password reset link → ${link}`)
   }
 }
