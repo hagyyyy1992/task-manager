@@ -58,6 +58,16 @@ describe('JoseTokenService', () => {
     expect(verified?.jti).toBe('jti-xyz')
   })
 
+  it('issueLongLived の exp は 90 日後 ± 数秒 (issue #62)', async () => {
+    const { decodeJwt } = await import('jose')
+    const before = Math.floor(Date.now() / 1000)
+    const token = await svc.issueLongLived('user-1', 'jti-90d')
+    const payload = decodeJwt(token)
+    const NINETY_DAYS_SEC = 90 * 24 * 60 * 60
+    expect(payload.exp).toBeGreaterThanOrEqual(before + NINETY_DAYS_SEC - 5)
+    expect(payload.exp).toBeLessThanOrEqual(before + NINETY_DAYS_SEC + 5)
+  })
+
   // issue #37 以前に発行された旧 mcp トークン (jti claim 無し) との互換性確認。
   // verify は jti=null を返し、middleware 側で 401 拒否される (再発行を強制する設計)。
   it('jti claim 無しの mcp トークンは verify で jti=null', async () => {

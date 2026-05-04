@@ -17,13 +17,15 @@ export class JoseTokenService implements TokenService {
       .sign(this.secret)
   }
 
-  // MCP 等の長期利用クライアント向け（1年）。UI 経由の通常ログインでは使わない。
+  // MCP 等の長期利用クライアント向け（90 日）。UI 経由の通常ログインでは使わない。
   // jti は呼び出し側で生成して渡し、DB の Token テーブルと突合可能にする (issue #37)。
+  // TTL は当初 365d だったが、漏洩時の被害が大きいため 90d に短縮 (issue #62)。
+  // 既存発行済みトークンには影響なし (各々の exp 通りに運用継続)。
   async issueLongLived(userId: string, jti: string): Promise<string> {
     return new SignJWT({ sub: userId, scope: 'mcp' satisfies TokenScope })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('365d')
+      .setExpirationTime('90d')
       .setJti(jti)
       .sign(this.secret)
   }
