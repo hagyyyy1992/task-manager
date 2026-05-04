@@ -27,7 +27,7 @@ URL: AWS Console → CloudWatch → Dashboards → `task-app-waf-monitoring` (re
 
 ### 1. 検知トリガー
 
-- ユーザーから「ログインできない」「`429` / `403` が返る」報告
+- ユーザーから「ログインできない」「`403 Forbidden` が返る」報告 (rate-limit による block は HTTP 403 のみ。WAF カスタムレスポンス未設定では 429 は返らない)
 - CloudWatch Alarm `task-app-waf-auth-blocks` または `task-app-waf-auth-mutating-blocks` 発火
 - ダッシュボードで急激な BlockedRequests スパイクを発見
 
