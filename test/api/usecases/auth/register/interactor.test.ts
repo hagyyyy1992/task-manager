@@ -4,6 +4,7 @@ import type { UserRepository } from '@api/domain/repositories/UserRepository.js'
 import type { CategoryRepository } from '@api/domain/repositories/CategoryRepository.js'
 import type { PasswordHashService } from '@api/domain/services/PasswordHashService.js'
 import type { TokenService } from '@api/domain/services/TokenService.js'
+import type { BreachedPasswordChecker } from '@api/domain/services/BreachedPasswordChecker.js'
 
 const mockUser = {
   id: 'u1',
@@ -18,11 +19,12 @@ let categories: CategoryRepository
 let passwords: PasswordHashService
 let tokens: TokenService
 let isAllowed: () => boolean
+let breachedChecker: BreachedPasswordChecker
 let interactor: RegisterInteractor
 
 const validInput = {
   email: 'test@example.com',
-  password: 'password1234',
+  password: 'StrongPass123!',
   name: 'Test User',
   termsAgreed: true,
 }
@@ -55,7 +57,15 @@ beforeEach(() => {
     verify: vi.fn(),
   }
   isAllowed = () => true
-  interactor = new RegisterInteractor(users, categories, passwords, tokens, () => isAllowed())
+  breachedChecker = { isBreached: vi.fn().mockResolvedValue(false) }
+  interactor = new RegisterInteractor(
+    users,
+    categories,
+    passwords,
+    tokens,
+    () => isAllowed(),
+    breachedChecker,
+  )
 })
 
 describe('RegisterInteractor', () => {
@@ -63,7 +73,8 @@ describe('RegisterInteractor', () => {
     const result = await interactor.execute(validInput)
     expect(result).toEqual({ ok: true, user: mockUser, token: 'test-token' })
     expect(categories.seedDefaults).toHaveBeenCalledWith('u1')
-    expect(passwords.hash).toHaveBeenCalledWith('password1234')
+    expect(passwords.hash).toHaveBeenCalledWith('StrongPass123!')
+    expect(breachedChecker.isBreached).toHaveBeenCalledWith('StrongPass123!')
   })
 
   it('登録無効化中は disabled', async () => {
@@ -80,10 +91,63 @@ describe('RegisterInteractor', () => {
     if (!result.ok) expect(result.reason).toBe('invalid_input')
   })
 
-  it('短いパスワードは invalid_input', async () => {
-    const result = await interactor.execute({ ...validInput, password: 'short' })
+  it('短いパスワード(12文字未満)は invalid_input (issue #61)', async () => {
+    const result = await interactor.execute({ ...validInput, password: 'Short1!' })
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.message).toContain('8 characters')
+    if (!result.ok) expect(result.message).toContain('12 characters')
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('英字のみ(数字なし)パスワードは invalid_input (issue #61)', async () => {
+    const result = await interactor.execute({ ...validInput, password: 'OnlyLettersHere' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('letters and digits')
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('数字のみ(英字なし)パスワードは invalid_input (issue #61)', async () => {
+    const result = await interactor.execute({ ...validInput, password: '123456789012' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('letters and digits')
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('メールローカル部を含むパスワードは invalid_input (issue #61)', async () => {
+    const result = await interactor.execute({
+      ...validInput,
+      email: 'alice@example.com',
+      password: 'aliceStrong123',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('email local part')
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('HIBP で漏洩している PW は invalid_input (issue #61)', async () => {
+    breachedChecker.isBreached = vi.fn().mockResolvedValue(true)
+    const result = await interactor.execute(validInput)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('data breach')
+    expect(users.create).not.toHaveBeenCalled()
+  })
+
+  it('HIBP が例外を投げても fail-open で登録は通る (issue #61)', async () => {
+    breachedChecker.isBreached = vi.fn().mockRejectedValue(new Error('network down'))
+    const result = await interactor.execute(validInput)
+    expect(result.ok).toBe(true)
+    expect(users.create).toHaveBeenCalled()
+  })
+
+  it('breachedChecker 未注入でも登録は通る (DI 欠落の互換)', async () => {
+    const interactorNoChecker = new RegisterInteractor(
+      users,
+      categories,
+      passwords,
+      tokens,
+      () => true,
+    )
+    const result = await interactorNoChecker.execute(validInput)
+    expect(result.ok).toBe(true)
   })
 
   it('規約未同意は terms_required', async () => {
