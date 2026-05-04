@@ -6,6 +6,7 @@ import { PrismaUserRepository } from '../../interface-adapters/repositories/Pris
 import { PrismaTokenRepository } from '../../interface-adapters/repositories/PrismaTokenRepository.js'
 import { ScryptPasswordHashService } from '../../interface-adapters/services/ScryptPasswordHashService.js'
 import { JoseTokenService } from '../../interface-adapters/services/JoseTokenService.js'
+import { LogMailer } from '../../interface-adapters/services/LogMailer.js'
 
 import { RegisterInteractor } from '../../usecases/auth/register/interactor.js'
 import { LoginInteractor } from '../../usecases/auth/login/interactor.js'
@@ -15,6 +16,8 @@ import { DeleteAccountInteractor } from '../../usecases/auth/delete-account/inte
 import { ListMcpTokensInteractor } from '../../usecases/auth/list-mcp-tokens/interactor.js'
 import { IssueMcpTokenInteractor } from '../../usecases/auth/issue-mcp-token/interactor.js'
 import { RevokeMcpTokenInteractor } from '../../usecases/auth/revoke-mcp-token/interactor.js'
+import { ForgotPasswordInteractor } from '../../usecases/auth/forgot-password/interactor.js'
+import { ResetPasswordInteractor } from '../../usecases/auth/reset-password/interactor.js'
 
 import { ListTasksInteractor } from '../../usecases/tasks/list/interactor.js'
 import { CreateTaskInteractor } from '../../usecases/tasks/create/interactor.js'
@@ -28,6 +31,7 @@ import { DeleteCategoryInteractor } from '../../usecases/categories/delete/inter
 import { ReorderCategoriesInteractor } from '../../usecases/categories/reorder/interactor.js'
 
 import type { TokenService } from '../../domain/services/TokenService.js'
+import type { Mailer } from '../../domain/services/Mailer.js'
 import type { UserRepository } from '../../domain/repositories/UserRepository.js'
 import type { TokenRepository } from '../../domain/repositories/TokenRepository.js'
 import type { RegisterUseCase } from '../../usecases/auth/register/input-port.js'
@@ -38,6 +42,8 @@ import type { DeleteAccountUseCase } from '../../usecases/auth/delete-account/in
 import type { ListMcpTokensUseCase } from '../../usecases/auth/list-mcp-tokens/input-port.js'
 import type { IssueMcpTokenUseCase } from '../../usecases/auth/issue-mcp-token/input-port.js'
 import type { RevokeMcpTokenUseCase } from '../../usecases/auth/revoke-mcp-token/input-port.js'
+import type { ForgotPasswordUseCase } from '../../usecases/auth/forgot-password/input-port.js'
+import type { ResetPasswordUseCase } from '../../usecases/auth/reset-password/input-port.js'
 import type { ListTasksUseCase } from '../../usecases/tasks/list/input-port.js'
 import type { CreateTaskUseCase } from '../../usecases/tasks/create/input-port.js'
 import type { UpdateTaskUseCase } from '../../usecases/tasks/update/input-port.js'
@@ -62,6 +68,8 @@ export interface Container {
   listMcpTokens: ListMcpTokensUseCase
   issueMcpToken: IssueMcpTokenUseCase
   revokeMcpToken: RevokeMcpTokenUseCase
+  forgotPassword: ForgotPasswordUseCase
+  resetPassword: ResetPasswordUseCase
   listTasks: ListTasksUseCase
   createTask: CreateTaskUseCase
   updateTask: UpdateTaskUseCase
@@ -77,6 +85,7 @@ export interface ContainerOverrides {
   prisma?: PrismaClient
   tokens?: TokenService
   tokenRepo?: TokenRepository
+  mailer?: Mailer
 }
 
 export function createContainer(overrides: ContainerOverrides = {}): Container {
@@ -95,6 +104,26 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     if (!secret) throw new Error('JWT_SECRET is required')
     tokens = new JoseTokenService(secret)
   }
+
+  // Mailer は domain port。本 PR は LogMailer のみ実装し、SES_ENABLED=true で
+  // 将来 SesMailer に切り替える設計余地を残す (実装は follow-up issue / issue #66)。
+  // 本 PR で SesMailer を実装していないため SES_ENABLED が true でも LogMailer にフォールバックする。
+  let mailer: Mailer
+  if (overrides.mailer) {
+    mailer = overrides.mailer
+  } else {
+    mailer = new LogMailer()
+    if (process.env.SES_ENABLED === 'true') {
+      console.warn(
+        'SES_ENABLED=true is set but SesMailer is not implemented yet (follow-up of issue #66); falling back to LogMailer',
+      )
+    }
+  }
+
+  // reset password link の base URL。本番は ALLOWED_ORIGINS の最初を使う想定だが、
+  // 明示的に PASSWORD_RESET_URL_BASE を分離して設定可能にする。未設定時は空文字 (相対パス) で
+  // フロントの SPA がカレントオリジンで処理する。
+  const resetUrlBase = process.env.PASSWORD_RESET_URL_BASE ?? ''
 
   const isRegistrationAllowed = () => process.env.ALLOW_REGISTRATION === 'true'
 
@@ -131,6 +160,8 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     listMcpTokens: new ListMcpTokensInteractor(tokenRepo),
     issueMcpToken: new IssueMcpTokenInteractor(tokens, tokenRepo, isDemoUser),
     revokeMcpToken: new RevokeMcpTokenInteractor(tokenRepo),
+    forgotPassword: new ForgotPasswordInteractor(userRepo, tokenRepo, mailer, resetUrlBase),
+    resetPassword: new ResetPasswordInteractor(userRepo, tokenRepo, passwords),
     listTasks: new ListTasksInteractor(taskRepo),
     createTask: new CreateTaskInteractor(taskRepo),
     updateTask: new UpdateTaskInteractor(taskRepo),
