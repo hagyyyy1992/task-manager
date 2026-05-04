@@ -119,7 +119,7 @@ Log group: `aws-waf-logs-task-app-cloudfront` (us-east-1)
 | password/account が法人 NAT で block | `auth-mutating-rate-limit` | limit=50, threshold=5 | limit=100, threshold=10 |
 | `/api/*` 全体が共有 IP で block | `api-global-rate-limit` | limit=2000 | limit=4000 |
 
-調整は `terraform/waf.tf` の `limit` と `terraform/waf.tf` 末尾の alarm `threshold` を同時に変更し、PR で履歴を残すこと。
+調整は `terraform/waf.tf` の rule 内 `limit` と alarm リソースの `threshold` を同時に変更し、PR で履歴を残すこと。
 
 ## 観察期間 (post-deploy)
 
