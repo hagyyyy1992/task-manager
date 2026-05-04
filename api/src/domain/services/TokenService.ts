@@ -1,5 +1,6 @@
-// TokenScope の正規定義は Token.ts で行う。ここでは re-export のみ。
-export type { TokenScope } from '../entities/Token.js'
+// TokenScope の正規定義は Token.ts で行う。import してローカルで使いつつ re-export する。
+import type { TokenScope } from '../entities/Token.js'
+export type { TokenScope }
 
 export interface VerifiedToken {
   userId: string
