@@ -25,8 +25,15 @@ export function createJsonBodyMiddleware(): MiddlewareHandler {
       }
       return next()
     }
-    if (!ct.includes('application/json')) {
+    // ブラウザの CSP 違反レポートは Content-Type: application/csp-report で来る (RFC 7469)。
+    // CSP-Report-Only の receiver (/api/csp-report) を JSON body 強制から除外する (issue #58)。
+    if (!ct.includes('application/json') && !ct.includes('application/csp-report')) {
       return c.json({ error: 'Content-Type must be application/json' }, 400)
+    }
+    // application/csp-report は内部 JSON 構造の検証は受信側 handler に委ねる
+    // (壊れた CSP report はログに残せれば十分で、400 で弾くより素通しの方が信号を失わない)。
+    if (ct.includes('application/csp-report')) {
+      return next()
     }
     try {
       // パース結果を c.req.json() のキャッシュに乗せておく（Hono は内部キャッシュする）
