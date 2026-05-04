@@ -336,3 +336,105 @@ resource "aws_cloudwatch_metric_alarm" "waf_auth_mutating_blocks" {
     Rule   = "auth-mutating-rate-limit"
   }
 }
+
+# ─── CloudWatch Dashboard: 誤検知監視 (issue #71) ────────────────────────────
+# 全 rule の BlockedRequests を可視化し、observation 期間 (2-4w) での誤検知率測定と
+# 閾値見直しに使う。runbook (docs/runbook/waf.md) からこの dashboard を参照する。
+#
+# CloudFront scope の WAF メトリクスは us-east-1 リージョンに publish されるため、
+# widget 内の properties.region = "us-east-1" が必須。dashboard リソース自体の
+# リージョンは表示には関係ないが、provider alias を us_east_1 に揃える。
+#
+# Region 次元値は CloudFront scope では "CloudFront" を使う (既存アラームと同値)。
+locals {
+  waf_rule_names = [
+    "auth-rate-limit",
+    "auth-mutating-rate-limit",
+    "api-body-size-limit",
+    "api-global-rate-limit",
+  ]
+}
+
+resource "aws_cloudwatch_dashboard" "waf" {
+  provider       = aws.us_east_1
+  dashboard_name = "${var.project_name}-waf-monitoring"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 24
+        height = 8
+        properties = {
+          title   = "WAF BlockedRequests by Rule (last 24h, 5min sum)"
+          view    = "timeSeries"
+          stacked = false
+          region  = "us-east-1"
+          stat    = "Sum"
+          period  = 300
+          metrics = [
+            for rule in local.waf_rule_names : [
+              "AWS/WAFV2",
+              "BlockedRequests",
+              "WebACL", aws_wafv2_web_acl.cloudfront.name,
+              "Rule", rule,
+              "Region", "CloudFront",
+            ]
+          ]
+          yAxis = { left = { min = 0 } }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 8
+        width  = 24
+        height = 6
+        properties = {
+          title   = "WAF AllowedRequests by Rule (last 24h, 5min sum) — false-positive 検出用"
+          view    = "timeSeries"
+          stacked = false
+          region  = "us-east-1"
+          stat    = "Sum"
+          period  = 300
+          metrics = [
+            for rule in local.waf_rule_names : [
+              "AWS/WAFV2",
+              "AllowedRequests",
+              "WebACL", aws_wafv2_web_acl.cloudfront.name,
+              "Rule", rule,
+              "Region", "CloudFront",
+            ]
+          ]
+          yAxis = { left = { min = 0 } }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 14
+        width  = 24
+        height = 6
+        properties = {
+          title  = "WAF BlockedRequests by Rule (last 30d, 1h sum) — 閾値見直し用"
+          view   = "timeSeries"
+          region = "us-east-1"
+          stat   = "Sum"
+          period = 3600
+          metrics = [
+            for rule in local.waf_rule_names : [
+              "AWS/WAFV2",
+              "BlockedRequests",
+              "WebACL", aws_wafv2_web_acl.cloudfront.name,
+              "Rule", rule,
+              "Region", "CloudFront",
+            ]
+          ]
+          yAxis = { left = { min = 0 } }
+        }
+      },
+    ]
+  })
+}
