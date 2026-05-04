@@ -37,14 +37,19 @@ export class ForgotPasswordInteractor implements ForgotPasswordUseCase {
       return { ok: false, reason: 'invalid_input', message: 'invalid email format' }
     }
 
+    // タイミング正規化: token material を lookup 前に生成して crypto 処理コストを均一化する。
+    // user 不在時は id/jti を使わないが、randomBytes(32) + randomUUID() の実行時間を
+    // 揃えることで「email が存在するか否か」をタイミングで推定されにくくする。
+    // DB write / メール送信は依然として差が残るため、レート制限 (WAF ルール) で補完する。
+    const id = randomUUID()
+    const jti = generateResetJti()
+
     // email 列挙対策: 実在チェック結果に関わらず常に ok:true を返す (issue #66)。
     // 実在ユーザーには token を発行・mailer 経由でリンク送信。
     // 不在 email にはトークンを作らない (= DB に痕跡を残さない) が、
     // 応答時間差から enumeration されないよう、外側からは同じ ok:true に見せる。
     const user = await this.users.findByEmail(email)
     if (user && !(await this.isDemoUser(user.id))) {
-      const id = randomUUID()
-      const jti = generateResetJti()
       try {
         await this.tokenRepo.create({
           id,
