@@ -67,13 +67,18 @@ Log group: `aws-waf-logs-task-app-cloudfront` (us-east-1)
      name               = "${var.project_name}-emergency-allowlist"
      scope              = "CLOUDFRONT"
      ip_address_version = "IPV4"
-     addresses          = ["203.0.113.42/32"]  # ← 対象 IP/CIDR
+     addresses          = ["203.0.113.42/32"] # ← 対象 IP/CIDR
    }
 
-   # rule は priority を全 rule より小さく (= 先) して allow を最優先にする
+   # WAFv2 priority は 0 以上の整数のみ (負値不可)。
+   # 既存 rule の priority は 0, 2, 3, 4 で 1 が空いているのでそこに入れる。
+   # ただし auth-rate-limit (priority=0) より後ろになるため、login/register への
+   # rate-limit による block は緩和されない。auth-rate-limit より前で allow したい場合は
+   # priority=0 を allowlist に譲り、既存 rule を 2..5 にリナンバーする
+   # (この場合 WebACL 全体の差分になり、apply 中に短時間ルール評価順が混在する)。
    rule {
      name     = "emergency-ip-allowlist"
-     priority = -10  # 既存 rule (0,2,3,4) より前
+     priority = 1
      action {
        allow {}
      }
@@ -90,7 +95,9 @@ Log group: `aws-waf-logs-task-app-cloudfront` (us-east-1)
    }
    ```
 
-   注: WAFv2 は priority の小さいものから評価される。allow が早く match すれば後続 rule はスキップ。
+   注: WAFv2 は priority の小さいものから評価される。allow が match した時点で評価が終了し後続 rule はスキップ。
+
+   代替案: 既存 rate-limit rule に手を入れたくない場合は、各 rule の `scope_down_statement` を `and_statement` でくるみ `not_statement { ip_set_reference_statement }` を追加して対象 IP を rate-limit 対象から除外する方法もある (allowlist rule 不要だが既存 rule すべての改修が必要)。
 
 3. PR を作成して main にマージ → `terraform-apply.yml` を workflow_dispatch で実行
 4. 反映後、対象ユーザーに動作確認依頼
