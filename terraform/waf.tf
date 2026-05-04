@@ -14,6 +14,16 @@ resource "aws_wafv2_web_acl" "cloudfront" {
   name     = "${var.project_name}-cloudfront-acl"
   scope    = "CLOUDFRONT"
 
+  # CloudFront scope のデフォルト body inspection は 16 KB。api-body-size-limit ルールで
+  # 64 KB 超を検知するには KB_64 まで拡張が必要 (WCU 追加課金: ~25 WCU 増)。
+  association_config {
+    request_body {
+      cloudfront {
+        default_size_inspection_limit = "KB_64"
+      }
+    }
+  }
+
   default_action {
     allow {}
   }
@@ -191,7 +201,11 @@ resource "aws_wafv2_web_acl" "cloudfront" {
         statement {
           size_constraint_statement {
             field_to_match {
-              body {}
+              body {
+                # MATCH: 検査範囲(64 KB)を超えた body はそのまま本ルールにマッチさせて block。
+                # CONTINUE (default) では oversize 分がスキップされ 64 KB 超が素通りする。
+                oversize_handling = "MATCH"
+              }
             }
             comparison_operator = "GT"
             size                = 65536
