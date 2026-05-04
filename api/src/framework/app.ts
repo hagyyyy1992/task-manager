@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { createContainer, type Container, type ContainerOverrides } from './di/container.js'
 import { createAuthMiddleware, type AuthEnv } from './middleware/auth.middleware.js'
 import { createJsonBodyMiddleware } from './middleware/json-body.middleware.js'
+import { createBodySizeMiddleware } from './middleware/body-size.middleware.js'
 import { createAuthController } from './controllers/auth.controller.js'
 import { createTasksController } from './controllers/tasks.controller.js'
 import { createCategoriesController } from './controllers/categories.controller.js'
@@ -67,6 +68,10 @@ export function buildApp(options: BuildAppOptions = {}): Hono<AuthEnv> {
       allowHeaders: ['Content-Type', 'Authorization'],
     }),
   )
+  // 巨大 body を Lambda が受信・パースする前に 413 で打ち切る (issue #63)。
+  // json-body middleware より前に置くことで、不正 Content-Type の前にサイズで弾く。
+  // WAF 層 (terraform/waf.tf の size_constraint_statement) との多層防御。
+  app.use('/api/*', createBodySizeMiddleware())
   // ボディを伴う request の Content-Type と JSON 妥当性を一括検査して 400 を返す
   app.use('/api/*', createJsonBodyMiddleware())
 

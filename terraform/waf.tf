@@ -152,6 +152,63 @@ resource "aws_wafv2_web_acl" "cloudfront" {
     }
   }
 
+  # /api/* 配下で request body が 64 KB を超えるリクエストを edge で block (issue #63)。
+  # アプリ層 (api/src/framework/middleware/body-size.middleware.ts) と同じ閾値で
+  # 多層防御を構成する。CloudFront → WAF で先に弾くことで、巨大 body が API GW /
+  # Lambda に到達して受信・パース時間を消費するのを防ぐ。
+  #
+  # 注:
+  #   - WAF が body 検査できる範囲は最初の 8 KB (default) ～ 64 KB (oversize handling
+  #     を CONTINUE にしても 64 KB が hard cap)。size_constraint_statement は
+  #     Content-Length 相当の body サイズを比較するため 8 KB 上限の影響は受けない。
+  #   - size 比較対象は body のみ。HTTP method 不問 (GET 等で body 付きの異常も block)。
+  #   - text_transformation は size 比較には影響しないが API 必須なので NONE を 1 つ。
+  rule {
+    name     = "api-body-size-limit"
+    priority = 4
+
+    action {
+      block {}
+    }
+
+    statement {
+      and_statement {
+        statement {
+          byte_match_statement {
+            field_to_match {
+              uri_path {}
+            }
+            positional_constraint = "STARTS_WITH"
+            search_string         = "/api/"
+            text_transformation {
+              priority = 0
+              type     = "LOWERCASE"
+            }
+          }
+        }
+        statement {
+          size_constraint_statement {
+            field_to_match {
+              body {}
+            }
+            comparison_operator = "GT"
+            size                = 65536
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.project_name}-api-body-size-limit"
+      sampled_requests_enabled   = true
+    }
+  }
+
   # /api/* 全体の DDoS 緩衝。SPA の静的アセット (CloudFront S3 origin) は対象外。
   # しきい値は IP あたり 2000 req / 5min。共有 NAT/企業プロキシ配下で SPA を見るだけの
   # 通常利用は対象から外し、API レイヤの異常アクセスのみ落とす (codex review コメント対応)。
