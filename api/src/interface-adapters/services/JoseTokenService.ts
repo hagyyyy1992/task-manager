@@ -9,11 +9,12 @@ export class JoseTokenService implements TokenService {
     this.secret = new TextEncoder().encode(secret)
   }
 
-  async issue(userId: string): Promise<string> {
+  async issue(userId: string, jti: string): Promise<string> {
     return new SignJWT({ sub: userId, scope: 'session' satisfies TokenScope })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('7d')
+      .setJti(jti)
       .sign(this.secret)
   }
 
@@ -36,9 +37,12 @@ export class JoseTokenService implements TokenService {
       const { payload } = await jwtVerify(token, this.secret, { algorithms: ['HS256'] })
       const userId = payload.sub
       if (typeof userId !== 'string') return null
-      // 旧トークン（scope claim 無し）は session として扱う
+      // 既知 scope のみ受理。未知値 (reset 等) は null を返して呼び出し元で 401 にする。
+      // 旧トークン（scope claim 無し）は session として扱う互換性維持。
       const rawScope = payload.scope
-      const scope: TokenScope = rawScope === 'mcp' ? 'mcp' : 'session'
+      const scope: TokenScope | null =
+        rawScope === undefined ? 'session' : rawScope === 'mcp' ? 'mcp' : rawScope === 'session' ? 'session' : null
+      if (!scope) return null
       // iat 欠落は設計上ありえない (issue/issueLongLived は必ず setIssuedAt を呼ぶ) が、
       // 念のため 0 を返すと middleware 側で「変更日時より昔」と判定 → 失効させる
       const issuedAt = typeof payload.iat === 'number' ? payload.iat : 0

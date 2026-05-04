@@ -6,7 +6,11 @@
 // expiresAt 列を持たないため createdAt + RESET_TOKEN_TTL_MS で期限判定する。
 // jti は URL-safe random (base64url 32 byte) で password reset link に載せる。
 // 使用後は revokedAt を設定して single-use 化する。
-export type TokenScope = 'mcp' | 'reset'
+//
+// scope='session' は UI ログインの短期 (7d) セッション (issue #60)。
+// jti を JWT に埋め込み、Token テーブルで失効管理する。
+// logout / revoke-all-sessions で revokedAt を打つことで即時失効できる。
+export type TokenScope = 'mcp' | 'reset' | 'session'
 
 export interface Token {
   id: string

@@ -51,6 +51,7 @@ beforeEach(() => {
     listActiveByUser: vi.fn(),
     revoke: vi.fn(),
     revokeByJti: vi.fn().mockResolvedValue(true),
+    revokeAllByUserAndScope: vi.fn(),
     touchLastUsed: vi.fn(),
   }
   passwords = {

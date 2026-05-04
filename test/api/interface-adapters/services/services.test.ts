@@ -37,14 +37,15 @@ describe('JoseTokenService', () => {
     expect(() => new JoseTokenService('')).toThrow()
   })
 
-  it('issue → verify で userId / scope=session / iat (現在時刻 ±1s 以内) を復元', async () => {
+  it('issue → verify で userId / scope=session / iat (現在時刻 ±1s 以内) / jti を復元', async () => {
     const before = Math.floor(Date.now() / 1000)
-    const token = await svc.issue('user-1')
+    const token = await svc.issue('user-1', 'session-jti-1')
     const verified = await svc.verify(token)
     expect(verified?.userId).toBe('user-1')
     expect(verified?.scope).toBe('session')
     expect(verified?.issuedAt).toBeGreaterThanOrEqual(before)
     expect(verified?.issuedAt).toBeLessThanOrEqual(before + 1)
+    expect(verified?.jti).toBe('session-jti-1')
   })
 
   it('issueLongLived は scope=mcp / iat / 渡した jti を返す', async () => {
@@ -83,10 +84,10 @@ describe('JoseTokenService', () => {
     expect(verified?.jti).toBeNull()
   })
 
-  it('session トークンは jti=null', async () => {
-    const token = await svc.issue('user-1')
+  it('session トークンは渡した jti を返す (issue #60)', async () => {
+    const token = await svc.issue('user-1', 'my-session-jti')
     const verified = await svc.verify(token)
-    expect(verified?.jti).toBeNull()
+    expect(verified?.jti).toBe('my-session-jti')
   })
 
   it('改竄/不正トークンは null', async () => {
@@ -95,7 +96,7 @@ describe('JoseTokenService', () => {
 
   it('別シークレットで署名されたトークンは null', async () => {
     const other = new JoseTokenService('different-secret-xxxxxxxx')
-    const token = await other.issue('user-1')
+    const token = await other.issue('user-1', 'jti-other')
     expect(await svc.verify(token)).toBeNull()
   })
 

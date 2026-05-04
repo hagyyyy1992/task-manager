@@ -46,9 +46,13 @@ function makeContainer(): Container {
     issue: vi.fn().mockResolvedValue('test-token'),
     issueLongLived: vi.fn().mockResolvedValue('test-long-token'),
     // 既定では現時点で発行された session トークン扱い (passwordChangedAt 失効テスト以外は素通り)
-    verify: vi
-      .fn()
-      .mockResolvedValue({ userId: 'user123', scope: 'session', issuedAt: nowSec(), jti: null }),
+    // issue #60: session scope も jti 突合するため jti を付与
+    verify: vi.fn().mockResolvedValue({
+      userId: 'user123',
+      scope: 'session',
+      issuedAt: nowSec(),
+      jti: 'session-jti',
+    }),
   }
 
   // auth.middleware が削除済みユーザー / passwordChangedAt 判定で findById を叩くため最低限スタブする
@@ -56,14 +60,23 @@ function makeContainer(): Container {
     findById: vi.fn().mockResolvedValue(mockUser),
   }
 
-  // mcp scope の DB 突合 (issue #37) は session scope テストでは呼ばれないが、
-  // findByJti が undefined で参照されないようにスタブだけ用意しておく
+  // session / mcp scope の DB 突合 (issue #37, #60) で findByJti を叩くためスタブする
   const tokenRepo = {
-    findByJti: vi.fn().mockResolvedValue(null),
+    findByJti: vi.fn().mockResolvedValue({
+      id: 'tok-1',
+      userId: 'user123',
+      scope: 'session',
+      jti: 'session-jti',
+      label: '',
+      createdAt: new Date().toISOString(),
+      lastUsedAt: null,
+      revokedAt: null,
+    }),
     listActiveByUser: vi.fn().mockResolvedValue([]),
     create: vi.fn(),
     revoke: vi.fn().mockResolvedValue(true),
     revokeByJti: vi.fn().mockResolvedValue(true),
+    revokeAllByUserAndScope: vi.fn().mockResolvedValue(0),
     touchLastUsed: vi.fn().mockResolvedValue(undefined),
   }
 
@@ -83,6 +96,8 @@ function makeContainer(): Container {
     revokeMcpToken: usecase(vi.fn()),
     forgotPassword: usecase(vi.fn()),
     resetPassword: usecase(vi.fn()),
+    logout: usecase(vi.fn()),
+    revokeAllSessions: usecase(vi.fn()),
     listTasks: usecase(vi.fn()),
     createTask: usecase(vi.fn()),
     updateTask: usecase(vi.fn()),
@@ -140,10 +155,7 @@ describe('POST /api/csp-report', () => {
       }),
     )
     expect(res.status).toBe(204)
-    expect(warn).toHaveBeenCalledWith(
-      'csp.violation',
-      expect.objectContaining({ ua: 'test-ua' }),
-    )
+    expect(warn).toHaveBeenCalledWith('csp.violation', expect.objectContaining({ ua: 'test-ua' }))
     warn.mockRestore()
   })
 
@@ -307,7 +319,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: nowSec(),
-      jti: null,
+      jti: 'session-jti',
     })
     const app = (await import('@api/framework/app.js')).buildApp({ container })
     const res = await app.fetch(
@@ -325,7 +337,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: nowSec(),
-      jti: null,
+      jti: 'session-jti',
     })
     vi.mocked(container.deleteAccount.execute).mockResolvedValue({
       ok: false,
@@ -374,7 +386,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 10,
-      jti: null,
+      jti: 'session-jti',
     })
     const res = await req('/api/tasks')
     expect(res.status).toBe(401)
@@ -392,7 +404,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000),
-      jti: null,
+      jti: 'session-jti',
     })
     vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
@@ -413,7 +425,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000), // = 10:00:00
-      jti: null,
+      jti: 'session-jti',
     })
     vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
@@ -432,7 +444,7 @@ describe('auth middleware', () => {
       userId: 'user123',
       scope: 'session',
       issuedAt: Math.floor(passwordChangedAt.getTime() / 1000) - 5,
-      jti: null,
+      jti: 'session-jti',
     })
     vi.mocked(container.listTasks.execute).mockResolvedValue({ items: [], nextCursor: null })
     const res = await req('/api/tasks')
@@ -500,6 +512,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       create: vi.fn(),
       revoke: vi.fn(),
       revokeByJti: vi.fn(),
+      revokeAllByUserAndScope: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -537,6 +550,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       create: vi.fn(),
       revoke: vi.fn(),
       revokeByJti: vi.fn(),
+      revokeAllByUserAndScope: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -565,6 +579,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       create: vi.fn(),
       revoke: vi.fn(),
       revokeByJti: vi.fn(),
+      revokeAllByUserAndScope: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -579,7 +594,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
     }
     await mw(c as never, vi.fn())
     expect(captured!.status).toBe(401)
-    expect(captured!.body.error).toMatch(/re-issue/i)
+    expect(captured!.body.error).toMatch(/re-login|re-issue/i)
     expect(tokenRepo.findByJti).not.toHaveBeenCalled()
   })
 
@@ -608,6 +623,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       create: vi.fn(),
       revoke: vi.fn(),
       revokeByJti: vi.fn(),
+      revokeAllByUserAndScope: vi.fn(),
       touchLastUsed: vi.fn().mockResolvedValue(undefined),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })

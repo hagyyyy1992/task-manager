@@ -5,6 +5,7 @@ import type { CategoryRepository } from '@api/domain/repositories/CategoryReposi
 import type { PasswordHashService } from '@api/domain/services/PasswordHashService.js'
 import type { TokenService } from '@api/domain/services/TokenService.js'
 import type { BreachedPasswordChecker } from '@api/domain/services/BreachedPasswordChecker.js'
+import type { TokenRepository } from '@api/domain/repositories/TokenRepository.js'
 
 const mockUser = {
   id: 'u1',
@@ -20,6 +21,7 @@ let passwords: PasswordHashService
 let tokens: TokenService
 let isAllowed: () => boolean
 let breachedChecker: BreachedPasswordChecker
+let tokenRepo: TokenRepository
 let interactor: RegisterInteractor
 
 const validInput = {
@@ -58,12 +60,22 @@ beforeEach(() => {
   }
   isAllowed = () => true
   breachedChecker = { isBreached: vi.fn().mockResolvedValue(false) }
+  tokenRepo = {
+    create: vi.fn().mockResolvedValue({}),
+    findByJti: vi.fn(),
+    listActiveByUser: vi.fn(),
+    revoke: vi.fn(),
+    revokeByJti: vi.fn(),
+    revokeAllByUserAndScope: vi.fn(),
+    touchLastUsed: vi.fn(),
+  }
   interactor = new RegisterInteractor(
     users,
     categories,
     passwords,
     tokens,
     () => isAllowed(),
+    tokenRepo,
     breachedChecker,
   )
 })
@@ -145,6 +157,7 @@ describe('RegisterInteractor', () => {
       passwords,
       tokens,
       () => true,
+      tokenRepo,
     )
     const result = await interactorNoChecker.execute(validInput)
     expect(result.ok).toBe(true)

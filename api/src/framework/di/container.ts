@@ -19,6 +19,8 @@ import { IssueMcpTokenInteractor } from '../../usecases/auth/issue-mcp-token/int
 import { RevokeMcpTokenInteractor } from '../../usecases/auth/revoke-mcp-token/interactor.js'
 import { ForgotPasswordInteractor } from '../../usecases/auth/forgot-password/interactor.js'
 import { ResetPasswordInteractor } from '../../usecases/auth/reset-password/interactor.js'
+import { LogoutInteractor } from '../../usecases/auth/logout/interactor.js'
+import { RevokeAllSessionsInteractor } from '../../usecases/auth/revoke-all-sessions/interactor.js'
 
 import { ListTasksInteractor } from '../../usecases/tasks/list/interactor.js'
 import { CreateTaskInteractor } from '../../usecases/tasks/create/interactor.js'
@@ -45,6 +47,8 @@ import type { IssueMcpTokenUseCase } from '../../usecases/auth/issue-mcp-token/i
 import type { RevokeMcpTokenUseCase } from '../../usecases/auth/revoke-mcp-token/input-port.js'
 import type { ForgotPasswordUseCase } from '../../usecases/auth/forgot-password/input-port.js'
 import type { ResetPasswordUseCase } from '../../usecases/auth/reset-password/input-port.js'
+import type { LogoutUseCase } from '../../usecases/auth/logout/input-port.js'
+import type { RevokeAllSessionsUseCase } from '../../usecases/auth/revoke-all-sessions/input-port.js'
 import type { ListTasksUseCase } from '../../usecases/tasks/list/input-port.js'
 import type { CreateTaskUseCase } from '../../usecases/tasks/create/input-port.js'
 import type { UpdateTaskUseCase } from '../../usecases/tasks/update/input-port.js'
@@ -71,6 +75,8 @@ export interface Container {
   revokeMcpToken: RevokeMcpTokenUseCase
   forgotPassword: ForgotPasswordUseCase
   resetPassword: ResetPasswordUseCase
+  logout: LogoutUseCase
+  revokeAllSessions: RevokeAllSessionsUseCase
   listTasks: ListTasksUseCase
   createTask: CreateTaskUseCase
   updateTask: UpdateTaskUseCase
@@ -156,9 +162,10 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
       passwords,
       tokens,
       isRegistrationAllowed,
+      tokenRepo,
       breachedPasswordChecker,
     ),
-    login: new LoginInteractor(userRepo, passwords, tokens),
+    login: new LoginInteractor(userRepo, passwords, tokens, tokenRepo),
     me: new MeInteractor(userRepo),
     changePassword: new ChangePasswordInteractor(
       userRepo,
@@ -170,8 +177,21 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     listMcpTokens: new ListMcpTokensInteractor(tokenRepo),
     issueMcpToken: new IssueMcpTokenInteractor(tokens, tokenRepo, isDemoUser),
     revokeMcpToken: new RevokeMcpTokenInteractor(tokenRepo),
-    forgotPassword: new ForgotPasswordInteractor(userRepo, tokenRepo, mailer, resetUrlBase, isDemoUser),
-    resetPassword: new ResetPasswordInteractor(userRepo, tokenRepo, passwords, breachedPasswordChecker),
+    forgotPassword: new ForgotPasswordInteractor(
+      userRepo,
+      tokenRepo,
+      mailer,
+      resetUrlBase,
+      isDemoUser,
+    ),
+    resetPassword: new ResetPasswordInteractor(
+      userRepo,
+      tokenRepo,
+      passwords,
+      breachedPasswordChecker,
+    ),
+    logout: new LogoutInteractor(tokenRepo),
+    revokeAllSessions: new RevokeAllSessionsInteractor(tokenRepo),
     listTasks: new ListTasksInteractor(taskRepo),
     createTask: new CreateTaskInteractor(taskRepo),
     updateTask: new UpdateTaskInteractor(taskRepo),

@@ -21,6 +21,7 @@ describe('ListMcpTokensInteractor', () => {
       findByJti: vi.fn(),
       revoke: vi.fn(),
       revokeByJti: vi.fn(),
+      revokeAllByUserAndScope: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const result = await new ListMcpTokensInteractor(repo).execute('u1')

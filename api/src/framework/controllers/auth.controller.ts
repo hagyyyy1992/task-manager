@@ -145,6 +145,28 @@ export function createAuthController(container: Container) {
     return c.json({ error: result.message }, status)
   })
 
+  // session logout — 現在のセッショントークンを失効 (issue #60)
+  protectedRoutes.post('/logout', async (c) => {
+    if (c.get('scope') !== 'session') {
+      return c.json({ error: 'logout is only available for session tokens' }, 403)
+    }
+    // ミドルウェアが session scope の jti を保証するため null にならない
+    const jti = c.get('jti') as string
+    const result = await container.logout.execute({ userId: c.get('userId'), jti })
+    if (result.ok) return c.json({ message: 'logged out' }, 200)
+    // 既に revoke 済みのセッションも 200 で返す (冪等設計: 二重logout も安全)
+    return c.json({ message: 'already logged out' }, 200)
+  })
+
+  // 全セッション失効 (issue #60)
+  protectedRoutes.delete('/sessions', async (c) => {
+    if (c.get('scope') !== 'session') {
+      return c.json({ error: 'sessions endpoint is only available for session tokens' }, 403)
+    }
+    const result = await container.revokeAllSessions.execute({ userId: c.get('userId') })
+    return c.json({ message: 'all sessions revoked', revokedCount: result.revokedCount }, 200)
+  })
+
   protectedRoutes.delete('/mcp-tokens/:id', async (c) => {
     const result = await container.revokeMcpToken.execute({
       userId: c.get('userId'),

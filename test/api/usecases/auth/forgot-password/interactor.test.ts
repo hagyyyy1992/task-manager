@@ -34,6 +34,7 @@ beforeEach(() => {
     listActiveByUser: vi.fn(),
     revoke: vi.fn(),
     revokeByJti: vi.fn(),
+    revokeAllByUserAndScope: vi.fn(),
     touchLastUsed: vi.fn(),
   }
   mailer = { sendPasswordReset: vi.fn().mockResolvedValue(undefined) }
