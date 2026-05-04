@@ -811,6 +811,7 @@ describe('PATCH /api/auth/password', () => {
     ['invalid_input', 400, '8 characters'],
     ['unauthorized', 401, 'unauthorized'],
     ['wrong_password', 401, 'current password'],
+    ['demo_forbidden', 403, 'デモアカウントではパスワードを変更できません'],
     ['not_found', 404, 'user not found'],
   ] as const)('reason=%s -> status %d', async (reason, status, msg) => {
     vi.mocked(container.changePassword.execute).mockResolvedValue({
@@ -866,6 +867,43 @@ describe('DELETE /api/auth/account', () => {
     vi.mocked(container.deleteAccount.execute).mockResolvedValue({ ok: false, reason: 'not_found' })
     const res = await req('/api/auth/account', { method: 'DELETE', body: { currentPassword: 'p' } })
     expect(res.status).toBe(404)
+  })
+
+  it('returns 403 when demo user (issue #57)', async () => {
+    vi.mocked(container.deleteAccount.execute).mockResolvedValue({
+      ok: false,
+      reason: 'demo_forbidden',
+      message: 'デモアカウントは削除できません',
+    })
+    const res = await req('/api/auth/account', { method: 'DELETE', body: { currentPassword: 'p' } })
+    expect(res.status).toBe(403)
+  })
+})
+
+// ─── Auth: issue mcp-token demo guard (issue #57) ────────────────
+
+describe('POST /api/auth/mcp-tokens (demo guard)', () => {
+  it('returns 403 when demo user (issue #57)', async () => {
+    vi.mocked(container.issueMcpToken.execute).mockResolvedValue({
+      ok: false,
+      reason: 'demo_forbidden',
+      message: 'デモアカウントでは MCP トークンを発行できません',
+    })
+    const res = await req('/api/auth/mcp-tokens', { method: 'POST', body: { label: 'x' } })
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 400 when invalid_input', async () => {
+    vi.mocked(container.issueMcpToken.execute).mockResolvedValue({
+      ok: false,
+      reason: 'invalid_input',
+      message: 'label too long',
+    })
+    const res = await req('/api/auth/mcp-tokens', {
+      method: 'POST',
+      body: { label: 'x'.repeat(101) },
+    })
+    expect(res.status).toBe(400)
   })
 })
 

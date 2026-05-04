@@ -7,9 +7,18 @@ export class ChangePasswordInteractor implements ChangePasswordUseCase {
   constructor(
     private readonly users: UserRepository,
     private readonly passwords: PasswordHashService,
+    private readonly isDemoUser: (userId: string) => Promise<boolean> = async () => false,
   ) {}
 
   async execute(input: ChangePasswordInput): Promise<ChangePasswordOutput> {
+    // 共有デモアカウントは破壊的操作を全面禁止 (issue #57)
+    if (await this.isDemoUser(input.userId)) {
+      return {
+        ok: false,
+        reason: 'demo_forbidden',
+        message: 'デモアカウントではパスワードを変更できません',
+      }
+    }
     if (!input.currentPassword || !input.newPassword) {
       return {
         ok: false,

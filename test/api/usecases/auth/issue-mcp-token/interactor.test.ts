@@ -75,4 +75,24 @@ describe('IssueMcpTokenInteractor', () => {
     expect(tokens.issueLongLived).not.toHaveBeenCalled()
     expect(repo.create).not.toHaveBeenCalled()
   })
+
+  it('デモユーザーは demo_forbidden で拒否され issueLongLived/create は呼ばれない (issue #57)', async () => {
+    const repo = makeRepo()
+    const tokens = {
+      issue: vi.fn(),
+      issueLongLived: vi.fn().mockResolvedValue('jwt'),
+      verify: vi.fn(),
+    }
+    const isDemoUser = vi.fn().mockResolvedValue(true)
+    const result = await new IssueMcpTokenInteractor(tokens, repo, isDemoUser).execute({
+      userId: 'u1',
+      label: 'macbook',
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toBe('demo_forbidden')
+    expect(isDemoUser).toHaveBeenCalledWith('u1')
+    expect(tokens.issueLongLived).not.toHaveBeenCalled()
+    expect(repo.create).not.toHaveBeenCalled()
+  })
 })

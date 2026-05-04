@@ -16,9 +16,18 @@ export class IssueMcpTokenInteractor implements IssueMcpTokenUseCase {
   constructor(
     private readonly tokens: TokenService,
     private readonly tokenRepo: TokenRepository,
+    private readonly isDemoUser: (userId: string) => Promise<boolean> = async () => false,
   ) {}
 
   async execute(input: IssueMcpTokenInput): Promise<IssueMcpTokenOutput> {
+    // 共有デモアカウントは長期トークンの発行を禁止 (issue #57)
+    if (await this.isDemoUser(input.userId)) {
+      return {
+        ok: false,
+        reason: 'demo_forbidden',
+        message: 'デモアカウントでは MCP トークンを発行できません',
+      }
+    }
     const label = normalizeLabel(input.label)
     if (label === null) {
       return {

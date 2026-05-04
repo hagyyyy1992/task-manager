@@ -7,9 +7,18 @@ export class DeleteAccountInteractor implements DeleteAccountUseCase {
   constructor(
     private readonly users: UserRepository,
     private readonly passwords: PasswordHashService,
+    private readonly isDemoUser: (userId: string) => Promise<boolean> = async () => false,
   ) {}
 
   async execute(input: DeleteAccountInput): Promise<DeleteAccountOutput> {
+    // 共有デモアカウントは破壊的操作を全面禁止 (issue #57)
+    if (await this.isDemoUser(input.userId)) {
+      return {
+        ok: false,
+        reason: 'demo_forbidden',
+        message: 'デモアカウントは削除できません',
+      }
+    }
     if (!input.currentPassword) {
       return {
         ok: false,
