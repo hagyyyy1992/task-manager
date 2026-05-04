@@ -79,8 +79,9 @@ export class RegisterInteractor implements RegisterUseCase {
     const termsAgreedAt = new Date().toISOString()
     const user = await this.users.create(id, email, name, passwordHash, termsAgreedAt)
     await this.categories.seedDefaults(user.id)
+    // DB 登録を先に行い、失敗時は JWT を発行しない。
+    // JWT 発行後に DB 失敗すると「登録成功に見えて即 401」のUXバグになる。
     const jti = randomUUID()
-    const token = await this.tokens.issue(user.id, jti)
     await this.tokenRepo.create({
       id: randomUUID(),
       userId: user.id,
@@ -88,6 +89,7 @@ export class RegisterInteractor implements RegisterUseCase {
       jti,
       label: '',
     })
+    const token = await this.tokens.issue(user.id, jti)
 
     return { ok: true, user, token }
   }

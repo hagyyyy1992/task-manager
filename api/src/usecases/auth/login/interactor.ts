@@ -55,8 +55,9 @@ export class LoginInteractor implements LoginUseCase {
       return { ok: false, reason: 'invalid_credentials', message: INVALID }
     }
 
+    // DB 登録を先に行い、失敗時は JWT を発行しない。
+    // JWT 発行後に DB 失敗すると「ログイン成功に見えて即 401」のUXバグになる。
     const jti = randomUUID()
-    const token = await this.tokens.issue(userRow.id, jti)
     await this.tokenRepo.create({
       id: randomUUID(),
       userId: userRow.id,
@@ -64,6 +65,7 @@ export class LoginInteractor implements LoginUseCase {
       jti,
       label: '',
     })
+    const token = await this.tokens.issue(userRow.id, jti)
     const { passwordHash: _ph, ...user } = userRow
     void _ph
     console.info('auth.login.success', { userId: userRow.id })
