@@ -6,7 +6,7 @@ export interface VerifiedToken {
   scope: TokenScope
   // JWT iat (issued-at, epoch 秒)。auth middleware が User.passwordChangedAt と比較して失効判定に使う (issue #36)
   issuedAt: number
-  // mcp scope のみ jti claim を持つ。auth middleware が DB の Token.revokedAt と突き合わせる (issue #37)。
+  // mcp / session scope は jti claim を持つ。auth middleware が DB の Token.revokedAt と突き合わせる (issue #37, #60)。
   // PR #35 以前に発行された旧 mcp トークンには jti が無く、その場合は null。
   jti: string | null
 }
