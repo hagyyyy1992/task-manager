@@ -44,18 +44,20 @@ export class ChangePasswordInteractor implements ChangePasswordUseCase {
     const userRow = await this.users.findByIdWithSecret(input.userId)
     if (!userRow) return { ok: false, reason: 'unauthorized', message: 'unauthorized' }
 
-    // メール部分一致チェックは email 取得後に実施
+    // 現在 PW 検証を先に行う。verify 前に staticCheck を置くと、
+    // 「user が存在するが新 PW がポリシー違反」の分岐でタイミングオラクルが生じる。
+    const valid = await this.passwords.verify(input.currentPassword, userRow.passwordHash)
+    if (!valid) {
+      return { ok: false, reason: 'wrong_password', message: 'current password is incorrect' }
+    }
+
+    // メール部分一致チェックは email 取得後・現在 PW 検証後に実施
     const staticCheck = validatePasswordStatic({
       password: input.newPassword,
       email: userRow.email,
     })
     if (!staticCheck.ok) {
       return { ok: false, reason: 'invalid_input', message: staticCheck.message }
-    }
-
-    const valid = await this.passwords.verify(input.currentPassword, userRow.passwordHash)
-    if (!valid) {
-      return { ok: false, reason: 'wrong_password', message: 'current password is incorrect' }
     }
 
     const breachedCheck = await checkBreachedPassword(input.newPassword, this.breachedChecker)
