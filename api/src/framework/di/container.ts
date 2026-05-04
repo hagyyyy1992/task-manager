@@ -170,7 +170,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     listMcpTokens: new ListMcpTokensInteractor(tokenRepo),
     issueMcpToken: new IssueMcpTokenInteractor(tokens, tokenRepo, isDemoUser),
     revokeMcpToken: new RevokeMcpTokenInteractor(tokenRepo),
-    forgotPassword: new ForgotPasswordInteractor(userRepo, tokenRepo, mailer, resetUrlBase),
+    forgotPassword: new ForgotPasswordInteractor(userRepo, tokenRepo, mailer, resetUrlBase, isDemoUser),
     resetPassword: new ResetPasswordInteractor(userRepo, tokenRepo, passwords),
     listTasks: new ListTasksInteractor(taskRepo),
     createTask: new CreateTaskInteractor(taskRepo),

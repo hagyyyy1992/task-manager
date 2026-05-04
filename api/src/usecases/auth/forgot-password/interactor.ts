@@ -26,6 +26,8 @@ export class ForgotPasswordInteractor implements ForgotPasswordUseCase {
     private readonly mailer: Mailer,
     // reset link を組み立てる base URL (例: "https://app.example.com")。末尾スラッシュ不要。
     private readonly resetUrlBase: string,
+    // デモアカウントはパスワードリセット不可 (issue #57)。token を作らず ok:true を返す。
+    private readonly isDemoUser: (userId: string) => Promise<boolean> = async () => false,
   ) {}
 
   async execute(input: ForgotPasswordInput): Promise<ForgotPasswordOutput> {
@@ -40,7 +42,7 @@ export class ForgotPasswordInteractor implements ForgotPasswordUseCase {
     // 不在 email にはトークンを作らない (= DB に痕跡を残さない) が、
     // 応答時間差から enumeration されないよう、外側からは同じ ok:true に見せる。
     const user = await this.users.findByEmail(email)
-    if (user) {
+    if (user && !(await this.isDemoUser(user.id))) {
       const id = randomUUID()
       const jti = generateResetJti()
       try {

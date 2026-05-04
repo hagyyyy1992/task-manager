@@ -499,6 +499,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -535,6 +536,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -562,6 +564,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn(),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
@@ -604,6 +607,7 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
       listActiveByUser: vi.fn(),
       create: vi.fn(),
       revoke: vi.fn(),
+      revokeByJti: vi.fn(),
       touchLastUsed: vi.fn().mockResolvedValue(undefined),
     }
     const mw = createAuthMiddleware(tokens, users as never, tokenRepo, { allowedScopes: ['mcp'] })
