@@ -58,7 +58,12 @@ export function createAuthMiddleware(
         )
       }
       const tokenRow = await tokenRepo.findByJti(verified.jti)
-      if (!tokenRow || tokenRow.userId !== verified.userId || tokenRow.revokedAt !== null) {
+      if (
+        !tokenRow ||
+        tokenRow.userId !== verified.userId ||
+        tokenRow.scope !== verified.scope ||
+        tokenRow.revokedAt !== null
+      ) {
         return c.json({ error: 'invalid or expired token' }, 401)
       }
       // lastUsedAt は監査用。失敗しても認証フローは止めない (fire-and-forget)
