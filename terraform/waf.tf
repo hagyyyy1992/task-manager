@@ -49,9 +49,12 @@ resource "aws_wafv2_web_acl" "cloudfront" {
                 }
                 positional_constraint = "EXACTLY"
                 search_string         = "/api/auth/login"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
                 text_transformation {
                   priority = 0
-                  type     = "NONE"
+                  type     = "LOWERCASE"
                 }
               }
             }
@@ -62,9 +65,12 @@ resource "aws_wafv2_web_acl" "cloudfront" {
                 }
                 positional_constraint = "EXACTLY"
                 search_string         = "/api/auth/register"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
                 text_transformation {
                   priority = 0
-                  type     = "NONE"
+                  type     = "LOWERCASE"
                 }
               }
             }
@@ -106,9 +112,12 @@ resource "aws_wafv2_web_acl" "cloudfront" {
                 }
                 positional_constraint = "EXACTLY"
                 search_string         = "/api/auth/password"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
                 text_transformation {
                   priority = 0
-                  type     = "NONE"
+                  type     = "LOWERCASE"
                 }
               }
             }
@@ -119,9 +128,12 @@ resource "aws_wafv2_web_acl" "cloudfront" {
                 }
                 positional_constraint = "EXACTLY"
                 search_string         = "/api/auth/account"
+                # 大文字 bypass (例: /API/auth/...) を塞ぐため LOWERCASE に統一。
+                # trailing slash や query string は WAF uri_path には含まれないため
+                # 別途対策不要 (RFC 3986; AWS WAF の uri_path は path のみ) (issue #59)
                 text_transformation {
                   priority = 0
-                  type     = "NONE"
+                  type     = "LOWERCASE"
                 }
               }
             }
