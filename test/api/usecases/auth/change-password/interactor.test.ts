@@ -73,4 +73,18 @@ describe('ChangePasswordInteractor', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('wrong_password')
   })
+
+  it('デモユーザーは demo_forbidden で拒否され updatePassword は呼ばれない (issue #57)', async () => {
+    const isDemoUser = vi.fn().mockResolvedValue(true)
+    const demoInteractor = new ChangePasswordInteractor(users, passwords, isDemoUser)
+    const result = await demoInteractor.execute({
+      userId: 'u1',
+      currentPassword: 'pw1',
+      newPassword: 'newpassword1',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('demo_forbidden')
+    expect(isDemoUser).toHaveBeenCalledWith('u1')
+    expect(users.updatePassword).not.toHaveBeenCalled()
+  })
 })

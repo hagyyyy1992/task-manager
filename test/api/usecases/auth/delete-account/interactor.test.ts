@@ -67,4 +67,14 @@ describe('DeleteAccountInteractor', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('not_found')
   })
+
+  it('デモユーザーは demo_forbidden で拒否され delete は呼ばれない (issue #57)', async () => {
+    const isDemoUser = vi.fn().mockResolvedValue(true)
+    const demoInteractor = new DeleteAccountInteractor(users, passwords, isDemoUser)
+    const result = await demoInteractor.execute({ userId: 'u1', currentPassword: 'pw' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('demo_forbidden')
+    expect(isDemoUser).toHaveBeenCalledWith('u1')
+    expect(users.delete).not.toHaveBeenCalled()
+  })
 })

@@ -62,7 +62,9 @@ export function createAuthController(container: Container) {
         ? 400
         : result.reason === 'unauthorized' || result.reason === 'wrong_password'
           ? 401
-          : 404
+          : result.reason === 'demo_forbidden'
+            ? 403
+            : 404
     return c.json({ error: result.message }, status)
   })
 
@@ -81,7 +83,13 @@ export function createAuthController(container: Container) {
     })
     if (result.ok) return c.json({ message: 'account deleted' }, 200)
     const status =
-      result.reason === 'invalid_input' ? 400 : result.reason === 'wrong_password' ? 401 : 404
+      result.reason === 'invalid_input'
+        ? 400
+        : result.reason === 'wrong_password'
+          ? 401
+          : result.reason === 'demo_forbidden'
+            ? 403
+            : 404
     return c.json({ error: result.message ?? 'user not found' }, status)
   })
 
@@ -110,7 +118,8 @@ export function createAuthController(container: Container) {
       label: body.label,
     })
     if (result.ok) return c.json({ token: result.token, tokenId: result.tokenId }, 201)
-    return c.json({ error: result.message }, 400)
+    const status = result.reason === 'demo_forbidden' ? 403 : 400
+    return c.json({ error: result.message }, status)
   })
 
   protectedRoutes.delete('/mcp-tokens/:id', async (c) => {

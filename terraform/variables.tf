@@ -27,3 +27,9 @@ variable "allow_registration" {
   type        = string
   default     = "false"
 }
+
+variable "demo_user_emails" {
+  description = "共有デモアカウント (CSV)。指定したユーザーはパスワード変更・アカウント削除・MCPトークン発行が 403 拒否される (issue #57)"
+  type        = string
+  default     = "demo@example.com"
+}

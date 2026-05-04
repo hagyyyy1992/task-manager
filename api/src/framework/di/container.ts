@@ -98,6 +98,21 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
 
   const isRegistrationAllowed = () => process.env.ALLOW_REGISTRATION === 'true'
 
+  // DEMO_USER_EMAILS=demo@example.com,foo@example.com 形式で宣言したユーザーは
+  // パスワード変更・アカウント削除・MCP トークン発行を全面禁止する (issue #57)
+  const demoEmails = new Set(
+    (process.env.DEMO_USER_EMAILS ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  )
+  const isDemoUser = async (userId: string): Promise<boolean> => {
+    if (demoEmails.size === 0) return false
+    const user = await userRepo.findById(userId)
+    if (!user) return false
+    return demoEmails.has(user.email.toLowerCase())
+  }
+
   return {
     tokens,
     users: userRepo,
@@ -111,10 +126,10 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     ),
     login: new LoginInteractor(userRepo, passwords, tokens),
     me: new MeInteractor(userRepo),
-    changePassword: new ChangePasswordInteractor(userRepo, passwords),
-    deleteAccount: new DeleteAccountInteractor(userRepo, passwords),
+    changePassword: new ChangePasswordInteractor(userRepo, passwords, isDemoUser),
+    deleteAccount: new DeleteAccountInteractor(userRepo, passwords, isDemoUser),
     listMcpTokens: new ListMcpTokensInteractor(tokenRepo),
-    issueMcpToken: new IssueMcpTokenInteractor(tokens, tokenRepo),
+    issueMcpToken: new IssueMcpTokenInteractor(tokens, tokenRepo, isDemoUser),
     revokeMcpToken: new RevokeMcpTokenInteractor(tokenRepo),
     listTasks: new ListTasksInteractor(taskRepo),
     createTask: new CreateTaskInteractor(taskRepo),
