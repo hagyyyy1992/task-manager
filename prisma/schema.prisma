@@ -23,9 +23,11 @@ model User {
   @@map("users")
 }
 
-// MCP 等の長期トークン (issueLongLived) 個別失効のためのレコード。
-// JWT に jti claim を埋め、verify 時に DB の revokedAt を突き合わせる (issue #37)。
-// session トークン (短期) は追跡しない。
+// session / mcp / reset の 3 scope を管理するトークン失効レコード。
+// jti claim を JWT に埋め、verify 時に DB の revokedAt を突き合わせる (issue #37, #60)。
+// scope='session': ログイン毎に発行。logout / revoke-all-sessions で即時失効 (issue #60)。
+// scope='mcp': 長期 (90d)。issueMcpToken で発行、revokeMcpToken で失効 (issue #37)。
+// scope='reset': パスワードリセット単発トークン。使用後に revokedAt を打つ (issue #66)。
 model Token {
   id         String    @id @default(cuid())
   userId     String    @map("user_id")
