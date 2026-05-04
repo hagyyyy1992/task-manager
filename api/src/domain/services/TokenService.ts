@@ -1,4 +1,5 @@
-export type TokenScope = 'session' | 'mcp'
+// TokenScope の正規定義は Token.ts で行う。ここでは re-export のみ。
+export type { TokenScope } from '../entities/Token.js'
 
 export interface VerifiedToken {
   userId: string
