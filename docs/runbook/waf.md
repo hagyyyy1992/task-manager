@@ -140,6 +140,6 @@ PR #70 (auth-mutating-rate-limit) と PR #79 (api-body-size-limit) のマージ�
 
 ## 関連 issue / PR
 
-- #59 / PR #70: auth-mutating-rate-limit 追加
+- #59 / PR #70: auth-rate-limit + auth-mutating-rate-limit 追加
 - #63 / PR #79: api-body-size-limit + association_config KB_64
 - #71 (本 runbook 整備)
