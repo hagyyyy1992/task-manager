@@ -158,9 +158,11 @@ resource "aws_wafv2_web_acl" "cloudfront" {
   # Lambda に到達して受信・パース時間を消費するのを防ぐ。
   #
   # 注:
-  #   - WAF が body 検査できる範囲は最初の 8 KB (default) ～ 64 KB (oversize handling
-  #     を CONTINUE にしても 64 KB が hard cap)。size_constraint_statement は
-  #     Content-Length 相当の body サイズを比較するため 8 KB 上限の影響は受けない。
+  #   - CloudFront scope の WAF はデフォルトで body の最初の 16 KB のみ検査する。
+  #     64 KB まで検査するには association_config.request_body.cloudfront.
+  #     default_size_inspection_limit = "KB_64" が必要 (WCU 追加課金あり)。
+  #     さらに field_to_match.body.oversize_handling = "MATCH" を指定しないと
+  #     検査範囲外の body は CONTINUE (スキップ) となり本ルールが意図通りに発火しない。
   #   - size 比較対象は body のみ。HTTP method 不問 (GET 等で body 付きの異常も block)。
   #   - text_transformation は size 比較には影響しないが API 必須なので NONE を 1 つ。
   rule {
