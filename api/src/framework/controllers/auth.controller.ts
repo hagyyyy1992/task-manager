@@ -147,8 +147,11 @@ export function createAuthController(container: Container) {
 
   // session logout — 現在のセッショントークンを失効 (issue #60)
   protectedRoutes.post('/logout', async (c) => {
-    const jti = c.get('jti')
-    if (!jti) return c.json({ error: 'jti required for session logout' }, 400)
+    if (c.get('scope') !== 'session') {
+      return c.json({ error: 'logout is only available for session tokens' }, 403)
+    }
+    // ミドルウェアが session scope の jti を保証するため null にならない
+    const jti = c.get('jti') as string
     const result = await container.logout.execute({ userId: c.get('userId'), jti })
     if (result.ok) return c.json({ message: 'logged out' }, 200)
     // 既に revoke 済みのセッションも 200 で返す (冪等設計: 二重logout も安全)
@@ -157,6 +160,9 @@ export function createAuthController(container: Container) {
 
   // 全セッション失効 (issue #60)
   protectedRoutes.delete('/sessions', async (c) => {
+    if (c.get('scope') !== 'session') {
+      return c.json({ error: 'sessions endpoint is only available for session tokens' }, 403)
+    }
     const result = await container.revokeAllSessions.execute({ userId: c.get('userId') })
     return c.json({ message: 'all sessions revoked', revokedCount: result.revokedCount }, 200)
   })
