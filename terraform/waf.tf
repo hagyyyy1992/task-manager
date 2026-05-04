@@ -371,6 +371,54 @@ resource "aws_cloudwatch_metric_alarm" "waf_auth_mutating_blocks" {
   }
 }
 
+# api-global-rate-limit による block アラート (issue #84)。
+# /api/* 全体に対する rate-based rule (limit=2000 req/5min/IP) なので通常時は 0。
+# 5 分で 100 件超えたら DDoS の兆候として通知。
+# 100 という閾値は「rate-limit が 2000 req/5min で 1 IP が連続 block されると数十件は出る」
+# ことを想定し、複数 IP からの分散攻撃 (= DDoS の特徴) を検知する程度に設定。
+resource "aws_cloudwatch_metric_alarm" "waf_api_global_blocks" {
+  provider            = aws.us_east_1
+  alarm_name          = "${var.project_name}-waf-api-global-blocks"
+  alarm_description   = "WAF api-global-rate-limit による block が急増 (DDoS の可能性)"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "BlockedRequests"
+  namespace           = "AWS/WAFV2"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 100
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    WebACL = aws_wafv2_web_acl.cloudfront.name
+    Region = "CloudFront"
+    Rule   = "api-global-rate-limit"
+  }
+}
+
+# api-body-size-limit による block アラート (issue #84)。
+# 64 KB 超の body は通常運用では発生しないため、発火自体が異常。
+# 1 件でも block が出たら通知 (誤送信・スクレイパー・攻撃の可能性)。
+resource "aws_cloudwatch_metric_alarm" "waf_api_body_size_blocks" {
+  provider            = aws.us_east_1
+  alarm_name          = "${var.project_name}-waf-api-body-size-blocks"
+  alarm_description   = "WAF api-body-size-limit による block 発生 (64 KB 超リクエスト検知)"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "BlockedRequests"
+  namespace           = "AWS/WAFV2"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    WebACL = aws_wafv2_web_acl.cloudfront.name
+    Region = "CloudFront"
+    Rule   = "api-body-size-limit"
+  }
+}
+
 # ─── CloudWatch Dashboard: 誤検知監視 (issue #71) ────────────────────────────
 # 全 rule の BlockedRequests を可視化し、observation 期間 (2-4w) での誤検知率測定と
 # 閾値見直しに使う。runbook (docs/runbook/waf.md) からこの dashboard を参照する。
