@@ -12,4 +12,6 @@ terraform/.terraform.tfstate.lock.info
 terraform/.lambda-build/
 
 /api/src/generated/prisma
+src/generated/prisma
 coverage/
+.claude/
