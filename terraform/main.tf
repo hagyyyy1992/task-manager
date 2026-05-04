@@ -210,6 +210,12 @@ resource "aws_cloudfront_response_headers_policy" "security" {
   # Content-Security-Policy (enforce) に昇格させる別 PR を出す (issue #58)。
   # style-src の 'unsafe-inline' は Tailwind ランタイム / React 互換のため
   # 暫定で残す。enforce 化前に nonce 方式へ移行を検討。
+  #
+  # override = true の運用方針: CSP / Permissions-Policy は CloudFront を
+  # single source of truth とする。オリジン (Lambda) 側で同名ヘッダを返した
+  # 場合も CDN 側が上書きする。アプリ層で違反収集の試行錯誤をしたい場合は
+  # この override を一時的に false にするか、別の experimental ヘッダ名で
+  # 試すこと。
   custom_headers_config {
     items {
       header   = "Content-Security-Policy-Report-Only"
