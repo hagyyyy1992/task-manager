@@ -19,6 +19,28 @@ locals {
     "api-body-size-limit",
     "api-global-rate-limit",
   ]
+
+  # Dashboard widget の metrics 配列 (CloudWatch Dashboard JSON 仕様の
+  # `[Namespace, MetricName, DimName, DimValue, ...]` フラット配列)。
+  # 同じ shape を 3 widget で再利用するため locals に切り出して DRY 化。
+  waf_block_metrics = [
+    for rule in local.waf_rule_names : [
+      "AWS/WAFV2",
+      "BlockedRequests",
+      "WebACL", aws_wafv2_web_acl.cloudfront.name,
+      "Rule", rule,
+      "Region", "CloudFront",
+    ]
+  ]
+  waf_allow_metrics = [
+    for rule in local.waf_rule_names : [
+      "AWS/WAFV2",
+      "AllowedRequests",
+      "WebACL", aws_wafv2_web_acl.cloudfront.name,
+      "Rule", rule,
+      "Region", "CloudFront",
+    ]
+  ]
 }
 
 resource "aws_wafv2_web_acl" "cloudfront" {
@@ -378,16 +400,8 @@ resource "aws_cloudwatch_dashboard" "waf" {
           region  = "us-east-1"
           stat    = "Sum"
           period  = 300
-          metrics = [
-            for rule in local.waf_rule_names : [
-              "AWS/WAFV2",
-              "BlockedRequests",
-              "WebACL", aws_wafv2_web_acl.cloudfront.name,
-              "Rule", rule,
-              "Region", "CloudFront",
-            ]
-          ]
-          yAxis = { left = { min = 0 } }
+          metrics = local.waf_block_metrics
+          yAxis   = { left = { min = 0 } }
         }
       },
       {
@@ -403,16 +417,8 @@ resource "aws_cloudwatch_dashboard" "waf" {
           region  = "us-east-1"
           stat    = "Sum"
           period  = 300
-          metrics = [
-            for rule in local.waf_rule_names : [
-              "AWS/WAFV2",
-              "AllowedRequests",
-              "WebACL", aws_wafv2_web_acl.cloudfront.name,
-              "Rule", rule,
-              "Region", "CloudFront",
-            ]
-          ]
-          yAxis = { left = { min = 0 } }
+          metrics = local.waf_allow_metrics
+          yAxis   = { left = { min = 0 } }
         }
       },
       {
@@ -422,21 +428,13 @@ resource "aws_cloudwatch_dashboard" "waf" {
         width  = 24
         height = 6
         properties = {
-          title  = "WAF BlockedRequests by Rule (last 30d, 1h sum) — 閾値見直し用"
-          view   = "timeSeries"
-          region = "us-east-1"
-          stat   = "Sum"
-          period = 3600
-          metrics = [
-            for rule in local.waf_rule_names : [
-              "AWS/WAFV2",
-              "BlockedRequests",
-              "WebACL", aws_wafv2_web_acl.cloudfront.name,
-              "Rule", rule,
-              "Region", "CloudFront",
-            ]
-          ]
-          yAxis = { left = { min = 0 } }
+          title   = "WAF BlockedRequests by Rule (last 30d, 1h sum) — 閾値見直し用"
+          view    = "timeSeries"
+          region  = "us-east-1"
+          stat    = "Sum"
+          period  = 3600
+          metrics = local.waf_block_metrics
+          yAxis   = { left = { min = 0 } }
         }
       },
     ]
