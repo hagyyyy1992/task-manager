@@ -220,7 +220,7 @@ resource "aws_cloudfront_response_headers_policy" "security" {
     items {
       header   = "Permissions-Policy"
       override = true
-      value    = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+      value    = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=(), browsing-topics=()"
     }
   }
 }
