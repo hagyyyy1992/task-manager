@@ -151,7 +151,8 @@ export function createAuthController(container: Container) {
     if (!jti) return c.json({ error: 'jti required for session logout' }, 400)
     const result = await container.logout.execute({ userId: c.get('userId'), jti })
     if (result.ok) return c.json({ message: 'logged out' }, 200)
-    return c.json({ error: 'session not found' }, 404)
+    // 既に revoke 済みのセッションも 200 で返す (冪等設計: 二重logout も安全)
+    return c.json({ message: 'already logged out' }, 200)
   })
 
   // 全セッション失効 (issue #60)

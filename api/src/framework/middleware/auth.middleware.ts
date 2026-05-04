@@ -62,7 +62,9 @@ export function createAuthMiddleware(
         return c.json({ error: 'invalid or expired token' }, 401)
       }
       // lastUsedAt は監査用。失敗しても認証フローは止めない (fire-and-forget)
-      tokenRepo.touchLastUsed(verified.jti, new Date()).catch(() => {})
+      tokenRepo.touchLastUsed(verified.jti, new Date()).catch((err) => {
+        console.warn('auth.touchLastUsed.failed', { err })
+      })
     }
     c.set('userId', verified.userId)
     c.set('scope', verified.scope)
