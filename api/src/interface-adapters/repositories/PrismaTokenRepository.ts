@@ -1,5 +1,5 @@
 import type { TokenRepository } from '../../domain/repositories/TokenRepository.js'
-import type { Token } from '../../domain/entities/Token.js'
+import type { Token, TokenScope } from '../../domain/entities/Token.js'
 import type { PrismaClient } from '../../framework/prisma/client.js'
 
 interface DbTokenRow {
@@ -14,10 +14,13 @@ interface DbTokenRow {
 }
 
 function toEntity(row: DbTokenRow): Token {
+  // scope は DB に文字列で保存しているため、未知値は防御的に 'mcp' fallback する
+  // (異常データで Prisma 層が落ちないようにする。アプリ層は scope で分岐するので fallback でも安全)
+  const scope: TokenScope = row.scope === 'reset' ? 'reset' : 'mcp'
   return {
     id: row.id,
     userId: row.userId,
-    scope: 'mcp',
+    scope,
     jti: row.jti,
     label: row.label,
     createdAt: row.createdAt.toISOString(),
@@ -32,7 +35,7 @@ export class PrismaTokenRepository implements TokenRepository {
   async create(input: {
     id: string
     userId: string
-    scope: 'mcp'
+    scope: TokenScope
     jti: string
     label: string
   }): Promise<Token> {
@@ -54,8 +57,9 @@ export class PrismaTokenRepository implements TokenRepository {
   }
 
   async listActiveByUser(userId: string): Promise<Token[]> {
+    // scope='mcp' のみを返す。reset token (issue #66) は UI 表示対象外なので除外する
     const rows = await this.prisma.token.findMany({
-      where: { userId, revokedAt: null },
+      where: { userId, revokedAt: null, scope: 'mcp' },
       orderBy: { createdAt: 'desc' },
     })
     return rows.map(toEntity)
@@ -66,6 +70,16 @@ export class PrismaTokenRepository implements TokenRepository {
     // 既に revoke 済みの行は revokedAt を上書きしない（最初に取消した時刻を保つ）。
     const result = await this.prisma.token.updateMany({
       where: { id, userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    return result.count > 0
+  }
+
+  async revokeByJti(jti: string): Promise<boolean> {
+    // reset token (issue #66) を single-use 化するために jti 直指定で revoke。
+    // scope: 'reset' を WHERE に加えて mcp token を誤 revoke しない多層防御。
+    const result = await this.prisma.token.updateMany({
+      where: { jti, scope: 'reset', revokedAt: null },
       data: { revokedAt: new Date() },
     })
     return result.count > 0

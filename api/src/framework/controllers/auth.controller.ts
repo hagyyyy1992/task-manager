@@ -36,6 +36,29 @@ export function createAuthController(container: Container) {
     return c.json({ error: result.message }, status)
   })
 
+  // パスワードリセット要求 (issue #66)。
+  // email 列挙対策のため、実在ユーザー有無に関わらず常に 200 を返す。
+  // invalid_input (email 形式不正) のみ 400。
+  app.post('/forgot-password', async (c) => {
+    const body = await c.req.json<{ email?: string }>()
+    const result = await container.forgotPassword.execute({ email: body.email ?? '' })
+    if (result.ok) return c.json({ message: 'reset email sent if account exists' }, 200)
+    return c.json({ error: result.message }, 400)
+  })
+
+  // パスワードリセット実行 (issue #66)。
+  // 成功時は passwordChangedAt が更新され既存全 session JWT が失効する (issue #36 と同じ仕組み)。
+  app.post('/reset-password', async (c) => {
+    const body = await c.req.json<{ token?: string; newPassword?: string }>()
+    const result = await container.resetPassword.execute({
+      token: body.token ?? '',
+      newPassword: body.newPassword ?? '',
+    })
+    if (result.ok) return c.json({ message: 'password updated' }, 200)
+    const status = result.reason === 'invalid_input' ? 400 : 401
+    return c.json({ error: result.message }, status)
+  })
+
   // protected
   const protectedRoutes = new Hono<AuthEnv>()
   protectedRoutes.use(
