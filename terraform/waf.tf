@@ -9,6 +9,18 @@ provider "aws" {
   region = "us-east-1"
 }
 
+locals {
+  # WAF rule の name 値。Dashboard widget の metrics dimensions Rule に使う (issue #71)。
+  # 既存アラーム (waf_auth_blocks, waf_auth_mutating_blocks) の dimensions と同じ
+  # 命名規則 (var.project_name プレフィックスなし、rule の name 属性そのまま)。
+  waf_rule_names = [
+    "auth-rate-limit",
+    "auth-mutating-rate-limit",
+    "api-body-size-limit",
+    "api-global-rate-limit",
+  ]
+}
+
 resource "aws_wafv2_web_acl" "cloudfront" {
   provider = aws.us_east_1
   name     = "${var.project_name}-cloudfront-acl"
@@ -346,15 +358,7 @@ resource "aws_cloudwatch_metric_alarm" "waf_auth_mutating_blocks" {
 # リージョンは表示には関係ないが、provider alias を us_east_1 に揃える。
 #
 # Region 次元値は CloudFront scope では "CloudFront" を使う (既存アラームと同値)。
-locals {
-  waf_rule_names = [
-    "auth-rate-limit",
-    "auth-mutating-rate-limit",
-    "api-body-size-limit",
-    "api-global-rate-limit",
-  ]
-}
-
+# rule 名一覧は locals.waf_rule_names (ファイル冒頭) を参照。
 resource "aws_cloudwatch_dashboard" "waf" {
   provider       = aws.us_east_1
   dashboard_name = "${var.project_name}-waf-monitoring"
