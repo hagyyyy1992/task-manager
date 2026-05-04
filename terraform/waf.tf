@@ -90,6 +90,9 @@ resource "aws_wafv2_web_acl" "cloudfront" {
   # 操作だが currentPassword を要求するため、トークン窃取後のブルートフォース
   # 経路になる。login/register より頻度が低い (通常 1 ユーザー数回) ので
   # 50 req / 5min / IP で絞る (issue #59)。
+  # HTTP method は不問 (GET/HEAD 等を含めて IP 単位で抑制)。method-aware に
+  # するには and_statement で byte_match_statement (HTTP method = PATCH/DELETE)
+  # を追加するが、過剰検証で誤検知リスクが上がるため意図的に不問とする。
   rule {
     name     = "auth-mutating-rate-limit"
     priority = 2
