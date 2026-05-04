@@ -41,7 +41,7 @@ export class HibpBreachedPasswordChecker implements BreachedPasswordChecker {
         signal: controller.signal,
       })
       if (!res.ok) {
-        this.logger.warn(`[HibpBreachedPasswordChecker] HTTP ${res.status} (fail-open)`)
+        this.logger.warn(JSON.stringify({ event: 'hibp_failopen', reason: 'http_error', status: res.status }))
         return false
       }
       const text = await res.text()
@@ -58,7 +58,7 @@ export class HibpBreachedPasswordChecker implements BreachedPasswordChecker {
       return false
     } catch (err) {
       this.logger.warn(
-        `[HibpBreachedPasswordChecker] fetch failed (fail-open): ${(err as Error).message}`,
+        JSON.stringify({ event: 'hibp_failopen', reason: 'fetch_error', error: (err as Error).message }),
       )
       return false
     } finally {
