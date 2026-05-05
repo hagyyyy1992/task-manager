@@ -755,6 +755,44 @@ describe('createAuthMiddleware (mcp scope allow + jti 突合)', () => {
     expect(tokenRepo.touchLastUsed).toHaveBeenCalledWith('jti-s', expect.any(Date))
   })
 
+  it('session scope: 最終更新がちょうど 5 分前なら touchLastUsed を呼ぶ (>=境界)', async () => {
+    const { createAuthMiddleware } = await import('@api/framework/middleware/auth.middleware.js')
+    const tokens = {
+      issue: vi.fn(),
+      issueLongLived: vi.fn(),
+      verify: vi
+        .fn()
+        .mockResolvedValue({ userId: 'u1', scope: 'session', issuedAt: nowSec(), jti: 'jti-s' }),
+    }
+    const users = { findById: vi.fn().mockResolvedValue(mockUser) }
+    const exactlyFiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    const tokenRepo = {
+      findByJti: vi.fn().mockResolvedValue({
+        id: 't1',
+        userId: 'u1',
+        scope: 'session',
+        jti: 'jti-s',
+        label: '',
+        createdAt: '2026-04-27T00:00:00.000Z',
+        lastUsedAt: exactlyFiveMinutesAgo,
+        revokedAt: null,
+      }),
+      listActiveByUser: vi.fn(),
+      create: vi.fn(),
+      revoke: vi.fn(),
+      revokeByJti: vi.fn(),
+      revokeAllByUserAndScope: vi.fn(),
+      touchLastUsed: vi.fn().mockResolvedValue(undefined),
+    }
+    const mw = createAuthMiddleware(tokens, users as never, tokenRepo, {
+      allowedScopes: ['session'],
+    })
+    const c = { req: { header: () => 'Bearer x' }, json: vi.fn(), set: vi.fn() }
+    const next = vi.fn().mockResolvedValue(undefined)
+    await mw(c as never, next)
+    expect(tokenRepo.touchLastUsed).toHaveBeenCalledWith('jti-s', expect.any(Date))
+  })
+
   it('mcp scope: lastUsedAt の経過時間に関係なく毎回 touchLastUsed を呼ぶ (監査用)', async () => {
     const { createAuthMiddleware } = await import('@api/framework/middleware/auth.middleware.js')
     const tokens = {
