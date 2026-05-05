@@ -303,8 +303,12 @@ resource "aws_cloudfront_distribution" "main" {
   # 旧 forwarded_values (legacy API) → cache_policy_id + origin_request_policy_id (modern API) に移行:
   # - cache_policy_id: AWS Managed-CachingDisabled (TTL 0 / cache key なし) → 旧 min/default/max_ttl=0 と等価
   # - origin_request_policy_id: AWS Managed-AllViewerExceptHostHeader → Host を除く全 viewer headers
-  #   + cookies + query strings を origin に転送。Bearer JWT 認証で Cookie 不使用のため Cookie 転送
-  #   が増えても影響なし。CORS preflight ヘッダー (Origin / Access-Control-Request-*) も含まれる。
+  #   + cookies + query strings を origin に転送。「全 viewer headers」には Authorization も含まれる
+  #   (Host を除くすべての viewer headers が対象のため Bearer JWT 認証は引き続き動作する)。
+  #   Cookie は Bearer JWT 認証で不使用のため転送が増えても影響なし。
+  #   CORS preflight ヘッダー (Origin / Access-Control-Request-*) も含まれる。
+  #   QS は旧設定 (query_string=false) から全転送に変わるが、API 側は zod スキーマで
+  #   未知パラメータを弾くため副作用なし。
   # 注意: cache_policy_id 利用時は forwarded_values と min/default/max_ttl は併記不可 (AWS API 制約)。
   dynamic "ordered_cache_behavior" {
     for_each = toset(["/api", "/api/*"])
