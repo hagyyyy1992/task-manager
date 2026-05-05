@@ -27,6 +27,18 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
+# CloudFront マネージドポリシー (issue #80)。
+# /api と /api/* ビヘイビアで forwarded_values から cache_policy_id ベースに移行する際に使用。
+# ID をハードコードする方法もあるが (CachingDisabled=4135ea2d-..., AllViewerExceptHostHeader=b689b0a8-...)、
+# data source 経由のほうが将来 AWS が ID を変えた場合にも追従でき安全。
+data "aws_cloudfront_cache_policy" "caching_disabled" {
+  name = "Managed-CachingDisabled"
+}
+
+data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
+  name = "Managed-AllViewerExceptHostHeader"
+}
+
 # ─── SSM Parameter (DATABASE_URL) ───────────────────────────────────────────
 
 resource "aws_ssm_parameter" "database_url" {
@@ -283,64 +295,35 @@ resource "aws_cloudfront_distribution" "main" {
     max_ttl     = 86400
   }
 
-  # /api ビヘイビア (完全一致): API Gateway (キャッシュ無効)
+  # /api と /api/* の API Gateway 向けビヘイビア (issue #80)。
   # /api 単独パスは ordered_cache_behavior の path_pattern が "/api/*" だけだとマッチせず
-  # default_cache_behavior (S3 SPA fallback) に流れて index.html を 200 で返してしまう (Issue #64)。
-  # AWS docs: ordered_cache_behavior の path_pattern は完全一致パスを指定可能
-  # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesPathPattern
-  ordered_cache_behavior {
-    path_pattern               = "/api"
-    target_origin_id           = "APIGW"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods             = ["GET", "HEAD"]
-    compress                   = false
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+  # default_cache_behavior (S3 SPA fallback) に流れて index.html を 200 で返してしまう (issue #64)。
+  # 同一設定の 2 ビヘイビアを dynamic block + for_each で DRY 化し片方だけ修正する事故を防ぐ。
+  #
+  # 旧 forwarded_values (legacy API) → cache_policy_id + origin_request_policy_id (modern API) に移行:
+  # - cache_policy_id: AWS Managed-CachingDisabled (TTL 0 / cache key なし) → 旧 min/default/max_ttl=0 と等価
+  # - origin_request_policy_id: AWS Managed-AllViewerExceptHostHeader → Host を除く全 viewer headers
+  #   + cookies + query strings を origin に転送。「全 viewer headers」には Authorization も含まれる
+  #   (Host を除くすべての viewer headers が対象のため Bearer JWT 認証は引き続き動作する)。
+  #   Cookie は Bearer JWT 認証で不使用のため転送が増えても影響なし。
+  #   CORS preflight ヘッダー (Origin / Access-Control-Request-*) も含まれる。
+  #   QS は旧設定 (query_string=false) から全転送に変わるが、API 側は zod スキーマで
+  #   未知パラメータを弾くため副作用なし。
+  # 注意: cache_policy_id 利用時は forwarded_values と min/default/max_ttl は併記不可 (AWS API 制約)。
+  dynamic "ordered_cache_behavior" {
+    for_each = toset(["/api", "/api/*"])
+    content {
+      path_pattern           = ordered_cache_behavior.value
+      target_origin_id       = "APIGW"
+      viewer_protocol_policy = "redirect-to-https"
+      allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+      cached_methods         = ["GET", "HEAD"]
+      compress               = false
 
-    forwarded_values {
-      query_string = false
-      headers = [
-        "Content-Type",
-        "Authorization",
-        "Origin",
-        "Access-Control-Request-Method",
-        "Access-Control-Request-Headers",
-      ]
-      cookies { forward = "none" }
+      cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
+      origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+      response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
     }
-
-    min_ttl     = 0
-    default_ttl = 0
-    max_ttl     = 0
-  }
-
-  # /api/* ビヘイビア: API Gateway (キャッシュ無効)
-  ordered_cache_behavior {
-    path_pattern               = "/api/*"
-    target_origin_id           = "APIGW"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods             = ["GET", "HEAD"]
-    compress                   = false
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
-
-    forwarded_values {
-      query_string = false
-      # Origin と CORS プリフライト関連は CORS allowlist 判定のため Lambda に透過転送する。
-      # max_ttl = 0 のためキャッシュキー拡大による副作用なし。
-      headers = [
-        "Content-Type",
-        "Authorization",
-        "Origin",
-        "Access-Control-Request-Method",
-        "Access-Control-Request-Headers",
-      ]
-      cookies { forward = "none" }
-    }
-
-    min_ttl     = 0
-    default_ttl = 0
-    max_ttl     = 0
   }
 
   restrictions {
